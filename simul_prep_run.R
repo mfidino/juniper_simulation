@@ -22,12 +22,15 @@ nyear <- 5
 nrep <- 28
 
 
+# we can do it like this
+
 sim_list <- gen_sim_list(nsite, nspec, nyear, nrep)
 
-
-# make z matrix
-
 mats <- sim_matrices(sim_list)
+
+# or even this
+
+sims <- sim_all(nsite, nspec, nyear, nrep, add_NA = TRUE)
 
 
 
