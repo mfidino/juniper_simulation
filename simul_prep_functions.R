@@ -200,9 +200,9 @@ sim_ymat <- function(sim_list = NULL, jmat = jmat, z = z){
 ###----------------------------------------------------------------------------
 
 
-sim_matrices <- function(sim_list){
+sim_matrices <- function(sim_list, add_NA = TRUE){
   z <- sim_z(sim_list)
-  jmat <- sim_jmat(sim_list)
+  jmat <- sim_jmat(sim_list, add_NA = add_NA)
   ymat <- sim_ymat(sim_list, jmat, z)
   
   the_mats <- list(z = z,
