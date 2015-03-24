@@ -57,10 +57,10 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                    p = p,
                    gam = gam,
                    phi = phi,
-                   group_sd = list(gam = sd_gam,
+                   hyperp_sd = list(gam = sd_gam,
                                  phi = sd_phi,
                                  p = sd_p),
-                   group_actual = list(gam = actual_gam,
+                   hyperp_mean = list(gam = actual_gam,
                                  phi = actual_phi,
                                  p = actual_p)
                    )
@@ -137,7 +137,7 @@ sim_z <- function(sim_list = NULL){
 #     sim_jmat    sim_jmat    sim_jmat    sim_jmat    sim_jmat    sim_jmat
 ###----------------------------------------------------------------------------
 
-sim_jmat <- function(sim_list = NULL){
+sim_jmat <- function(sim_list = NULL, add_NA = TRUE){
   with(sim_list, {
     jmat <- array(0, dim = c(nspec, nsite, nyear))
     for( i in 1:nspec){
@@ -146,6 +146,14 @@ sim_jmat <- function(sim_list = NULL){
           jmat[i,j,t] <- floor(rnorm(1, 18, 2.5))
         }}}
     jmat[jmat>28] <- 28
+    
+    if(add_NA == TRUE){
+      years <- unique(ceiling(runif(5, 1, nyear)))
+      for(i in 1:length(years)){
+        sites <- floor(runif(15, 1, nsite))
+        jmat[,sites,years[i]] <- NA
+      }
+    }
     return(jmat)
     
   })
@@ -167,10 +175,14 @@ sim_ymat <- function(sim_list = NULL, jmat = jmat, z = z){
     for(i in 1:nspec){
       for(j in 1:nsite){
         for(t in 1:nyear){
+          if(is.na(jmat[i,j,t])==TRUE){
+            ymat[i,j,t] <- NA
+          }else{
           ymat[i,j,t] <- rbinom(1, jmat[i, j, t], p[i] * z[j, i, t])
-        }
-      }
-    }
+          } # end else
+        } # end t
+      } # end j
+    } # end i
     
     return(ymat)
     
@@ -183,7 +195,21 @@ sim_ymat <- function(sim_list = NULL, jmat = jmat, z = z){
 
 
 
+###----------------------------------------------------------------------------
+#     sim_matrices sim_matrices sim_matrices sim_matrices sim_matrices 
+###----------------------------------------------------------------------------
 
+
+sim_matrices <- function(sim_list){
+  z <- sim_z(sim_list)
+  jmat <- sim_jmat(sim_list)
+  ymat <- sim_ymat(sim_list, jmat, z)
+  
+  the_mats <- list(z = z,
+                   jmat = jmat,
+                   ymat = ymat)
+  return(the_mats)
+}
 
 
 
