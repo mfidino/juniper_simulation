@@ -25,6 +25,49 @@ expit <- function(x) {
 ###----------------------------------------------------------------------------
 
 
+gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
+                         nrep = NULL){
+  
+  # simulate gamma
+  actual_gam <- rbeta(1, 1, 1)
+  mu_gam <- logit(actual_gam)
+  sd_gam <- rgamma(1, 1)
+  log_spec_gam <- rnorm(nspec, mu_gam, sd_gam)
+  gam <- expit(log_spec_gam)
+  
+  # simulate phi
+  actual_phi <- rbeta(1, 1, 1)
+  mu_phi <- logit(actual_phi)
+  sd_phi <- rgamma(1,1)
+  log_spec_phi <- rnorm(nspec, mu_phi, sd_phi)
+  phi <- expit(log_spec_phi)
+  
+  # simulate p
+  
+  actual_p <- runif(1, .1, .3) # keeping it low, because camera traps
+  mu_p <- logit(actual_p)
+  sd_p <- rgamma(1,1)
+  log_spec_p <- rnorm(nspec, mu_p, sd_p)
+  p <- expit(log_spec_p)
+  
+  sim_list <- list(nsite = nsite,
+                   nspec = nspec,
+                   nyear = nyear,
+                   nrep = nrep,
+                   p = p,
+                   gam = gam,
+                   phi = phi,
+                   group_sd = list(gam = sd_gam,
+                                 phi = sd_phi,
+                                 p = sd_p),
+                   group_actual = list(gam = actual_gam,
+                                 phi = actual_phi,
+                                 p = actual_p)
+                   )
+  
+  return(sim_list)
+}
+
 
 
 ###############################################################################
