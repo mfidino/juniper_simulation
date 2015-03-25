@@ -26,27 +26,32 @@ expit <- function(x) {
 
 
 gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
-                         nrep = NULL){
+                         nrep = NULL, actual_gam = NULL, sd_gam = NULL,
+                         actual_phi = NULL, sd_phi = NULL,
+                         actual_p = NULL, sd_p = NULL){
   
   # simulate gamma
-  actual_gam <- rbeta(1, 1, 1)
+  if(missing(actual_gam)) actual_gam <- rbeta(1, 1, 1)
+  if(missing(sd_gam)) sd_gam <- runif(1, 1, 3)
+  
   mu_gam <- logit(actual_gam)
-  sd_gam <- rgamma(1, 1)
   log_spec_gam <- rnorm(nspec, mu_gam, sd_gam)
   gam <- expit(log_spec_gam)
   
   # simulate phi
-  actual_phi <- rbeta(1, 1, 1)
+  if(missing(actual_phi)) actual_phi <- rbeta(1, 1, 1)
+  if(missing(sd_phi)) sd_phi <- runif(1, 1, 3)
+  
   mu_phi <- logit(actual_phi)
-  sd_phi <- rgamma(1,1)
   log_spec_phi <- rnorm(nspec, mu_phi, sd_phi)
   phi <- expit(log_spec_phi)
   
   # simulate p
   
-  actual_p <- runif(1, .1, .3) # keeping it low, because camera traps
+  if(missing(actual_p)) actual_p <- runif(1, .1, .3) # keeping it low, because camera traps
+  if(missing(sd_p)) sd_p <- runif(1, 0, 3)
+  
   mu_p <- logit(actual_p)
-  sd_p <- rgamma(1,1)
   log_spec_p <- rnorm(nspec, mu_p, sd_p)
   p <- expit(log_spec_p)
   
@@ -84,7 +89,7 @@ sim_z <- function(sim_list = NULL){
   with(sim_list,{
   # initial occupancy states
   # makes a nsite * species matrix for the first season z0
-  phi0 <- runif(nspec, 0, 1)
+  phi0 <- runif(nspec, .1, .9)
   z0 <- array(dim = c(nsite, nspec))
   for (i in 1:nspec) {
     z0[, i] <- rbinom(nsite, 1, phi0[i])
