@@ -1,0 +1,76 @@
+model{
+    #### priors
+    
+    for(i in 1:nspec){
+    psi_in[i] ~ dbeta(1, 1)
+    }
+
+
+# gam hyperparameters
+    p_gam ~ dbeta(1, 1)
+    mu_gam <- log(p_gam / (1 - p_gam))
+    sigma_gam ~ dunif(0, 10)
+    tau_gam <- pow(sigma_gam,-2)
+    
+    # phi hyperparameters
+    p_phi ~ dbeta(1, 1)
+    mu_phi <- log(p_phi / (1 - p_phi))
+    sigma_phi~dunif(0,10)
+    tau_phi<- pow(sigma_phi,-2)
+    
+    # p hyperparameters
+    p_p ~ dbeta(1, 1)
+    mu_p <- log(p_p / (1 - p_p))
+    sigma_p ~ dunif(0,10)
+    tau_p <- pow(sigma_p, -2)
+    
+    
+
+    
+    
+    
+    #### occupancy model, specify the formulation of random effects here
+    # species specific random effects
+    for (i in 1:(nspec)) {
+    gam[i] ~ dnorm(mu_gam, tau_gam)
+    phi[i] ~ dnorm(mu_phi, tau_phi)
+    }
+
+    
+    
+    
+    
+    
+    # occupancy states
+    for (j in 1:(site)) {
+    for (i in 1:(nspec)) {
+    z[j, i, 1] ~ dbern(psi_in[i])
+    for (t in 2:nyear) {
+    logit(psi[j, i, t]) <-  gam[i] * (1 - z[j, i, t-1]) + #####################
+    phi[i] * z[j, i, t-1]
+    z[j, i, t] ~ dbern(psi[j, i, t])
+    }
+    }
+    }
+    
+    
+    
+    
+    #### detection model # this needs to be reworked
+    for(i in 1:(nspec)){ 
+    lp[i] ~ dnorm(mu_p, tau_p) 
+    p[i] <- (exp(lp[i])) / (1 + exp(lp[i])) #This is the spot to fix correct?
+    }
+    
+    
+    #### observation model
+    for (t in 1:(nyear)){
+    for (j in 1:(site)){
+    for (i in 1:(nspec)){
+    
+    mu[j, i, t] <- z[j, i, t] * p[i]
+    y[i, j, t] ~ dbin(mu[j, i, t], jmat[i, j, t])
+    }
+    }
+    }
+    }
