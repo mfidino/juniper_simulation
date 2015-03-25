@@ -144,7 +144,8 @@ sim_jmat <- function(sim_list = NULL, add_NA = TRUE){
         for(t in 1:nyear){
           jmat[,k,t] <- floor(rnorm(1, 18, 2.5))
         }}
-    jmat[jmat>28] <- 28
+    jmat[jmat>nrep] <- nrep # or less than 0
+    jmat[jmat<0] <- 0
     
     if(add_NA == TRUE){
       years <- unique(ceiling(runif(5, 1, nyear)))
