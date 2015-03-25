@@ -101,9 +101,9 @@ sim_z <- function(sim_list = NULL){
         
         if (t == 1) { #lpsi = logit of psi
           # just add together colonization
-          lgam <- (1 - z0[k, i])* (gam[i])
+          lgam <- (1 - z0[k, i])* (logit(gam[i])) #not expit gamma!
           # just add together persistence  
-          lphi <-  z0[k, i] * (phi[i])
+          lphi <-  z0[k, i] * (logit(phi[i]))
           # put both of them together in the lpsi matrix  
           lpsi[i, k, 1] <- lgam + lphi
           # expit of logit of psi
