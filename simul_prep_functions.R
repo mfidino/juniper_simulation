@@ -91,30 +91,30 @@ sim_z <- function(sim_list = NULL){
   }
   # subsequent occupancy
   # makes a nsite by species by year for the following years
-  z <- array(dim = c(nsite, nspec, nyear))
-  lpsi <- array(dim = c(nsite, nspec, nyear))
-  psi <- array(dim = c(nsite, nspec, nyear))
+  z <- array(dim = c(nspec, nsite, nyear))
+  lpsi <- array(dim = c(nspec, nsite, nyear))
+  psi <- array(dim = c(nspec, nsite, nyear))
   
   for(t in 1:nyear) {
-    for (j in 1:nsite) {
+    for (k in 1:nsite) {
       for (i in 1:nspec) {
         
         if (t == 1) { #lpsi = logit of psi
           # just add together colonization
-          lgam <- (1 - z0[j, i])* (gam[i])
+          lgam <- (1 - z0[k, i])* (gam[i])
           # just add together persistence  
-          lphi <-  z0[j, i] * (phi[i])
+          lphi <-  z0[k, i] * (phi[i])
           # put both of them together in the lpsi matrix  
-          lpsi[j, i, 1] <- lgam + lphi
+          lpsi[i, k, 1] <- lgam + lphi
           # expit of logit of psi
-          psi[j, i, 1] <- expit(lpsi[j, i, 1])
-          z[j, i, 1] <- rbinom(1, 1, psi[j, i, 1])
+          psi[i, k, 1] <- expit(lpsi[i, k, 1])
+          z[i, k, 1] <- rbinom(1, 1, psi[i, k, 1])
         } else {
-          lgam <- (1 - z[j, i, t-1])* (gam[i])
-          lphi <- z[j, i, t - 1] * (phi[i])
-          lpsi[j, i, t] <- lgam + lphi
-          psi[j, i, t] <- expit(lpsi[j, i, t])
-          z[j, i, t] <- rbinom(1, 1, psi[j, i, t])
+          lgam <- (1 - z[i, k, t-1])* (gam[i])
+          lphi <- z[i, k, t - 1] * (phi[i])
+          lpsi[i, k, t] <- lgam + lphi
+          psi[i, k, t] <- expit(lpsi[i, k, t])
+          z[i, k, t] <- rbinom(1, 1, psi[i, k, t])
         }
       }
     }
@@ -140,11 +140,10 @@ sim_z <- function(sim_list = NULL){
 sim_jmat <- function(sim_list = NULL, add_NA = TRUE){
   with(sim_list, {
     jmat <- array(0, dim = c(nspec, nsite, nyear))
-    for( i in 1:nspec){
-      for(j in 1:nsite){
+      for(k in 1:nsite){
         for(t in 1:nyear){
-          jmat[i,j,t] <- floor(rnorm(1, 18, 2.5))
-        }}}
+          jmat[,k,t] <- floor(rnorm(1, 18, 2.5))
+        }}
     jmat[jmat>28] <- 28
     
     if(add_NA == TRUE){
@@ -173,12 +172,12 @@ sim_ymat <- function(sim_list = NULL, jmat = jmat, z = z){
   ymat <- array(dim = c(nspec, nsite, nyear))
   with(sim_list, {
     for(i in 1:nspec){
-      for(j in 1:nsite){
+      for(k in 1:nsite){
         for(t in 1:nyear){
-          if(is.na(jmat[i,j,t])==TRUE){
-            ymat[i,j,t] <- NA
+          if(is.na(jmat[i,k,t])==TRUE){
+            ymat[i,k,t] <- NA
           }else{
-          ymat[i,j,t] <- rbinom(1, jmat[i, j, t], p[i] * z[j, i, t])
+          ymat[i,k,t] <- rbinom(1, jmat[i, k, t], p[i] * z[i, k, t])
           } # end else
         } # end t
       } # end j
@@ -200,11 +199,11 @@ sim_ymat <- function(sim_list = NULL, jmat = jmat, z = z){
 ###----------------------------------------------------------------------------
 
 make_zinit <- function(ymat = NULL, simlist = NULL){
-  zinit <- array(dim = c(nsite, nspec, nyear))
-  for(j in 1:nsite){
+  zinit <- array(dim = c(nspec, nsite, nyear))
+  for(k in 1:nsite){
     for(i in 1:nspec){
       for(t in 1:nyear){
-        zinit[j,i,t] <- ymat[i, j, t]
+        zinit[i,k,t] <- ymat[i, k, t]
       }
     }
   }
@@ -249,8 +248,18 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
                           nyear = nyear, nrep = nrep)
   mats <- sim_matrices(sim_list = sim_list, add_NA = add_NA)
   
+  mats$jmat[which(is.na(mats$jmat)==TRUE)] <- 0
+  
+  data_list <- list(y = mats$ymat, nsite = nsite, nyear = nyear,
+                    nspec = nspec, jmat = mats$jmat)
+  
+  
+
+  
   sims <- list(sim_list = sim_list,
-               mats = mats)
+               mats = mats,
+               data_list = data_list)
+  
   
   return(sims)
 }
@@ -260,3 +269,29 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
 ###############################################################################
 
 
+grab_msd <- function(data = NULL){
+  stat <- data$statistics
+  ans <- array(0, dim = c(nrow(stat), 2))
+  for(i in 1:nrow(stat)){
+    ans[i,] <- stat[i, 1:2]
+  }
+  rownames(ans) <- rownames(stat)
+  colnames(ans) <- colnames(stat[,1:2])
+  return(ans)
+}
+grab_quant <- function(data = NULL){
+  quant <- data$quantiles
+  ans <- array(0, dim = c(nrow(quant), 2))
+  for(i in 1:nrow(quant)){
+    ans[i,] <- quant[i, c(1,5)]
+  }
+  rownames(ans) <- rownames(quant)
+  colnames(ans) <- colnames(quant)[c(1,5)]
+  return(ans)
+}
+
+pull_summary <- function(data){
+  step_one <- grab_msd(data)
+  step_two <- grab_quant(data)
+  return(signif(cbind(step_one, step_two), 3))
+}

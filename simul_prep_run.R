@@ -9,7 +9,7 @@
 
 
 
-source("simul_prep_function.R")
+source("simul_prep_functions.R")
 
 
 

@@ -42,13 +42,13 @@ model{
     
     
     # occupancy states
-    for (j in 1:(site)) {
+    for (k in 1:(nsite)) {
     for (i in 1:(nspec)) {
-    z[j, i, 1] ~ dbern(psi_in[i])
+    z[i, k, 1] ~ dbern(psi_in[i])
     for (t in 2:nyear) {
-    logit(psi[j, i, t]) <-  gam[i] * (1 - z[j, i, t-1]) + #####################
-    phi[i] * z[j, i, t-1]
-    z[j, i, t] ~ dbern(psi[j, i, t])
+    logit(psi[i, k, t]) <-  gam[i] * (1 - z[i, k, t-1]) + #####################
+    phi[i] * z[i, k, t-1]
+    z[i, k, t] ~ dbern(psi[i, k, t])
     }
     }
     }
@@ -64,13 +64,13 @@ model{
     
     
     #### observation model
-    for (t in 1:(nyear)){
-    for (j in 1:(site)){
-    for (i in 1:(nspec)){
-    
-    mu[j, i, t] <- z[j, i, t] * p[i]
-    y[i, j, t] ~ dbin(mu[j, i, t], jmat[i, j, t])
+    for(i in 1:(nspec)){
+    for(k in 1:(nsite)){
+    for(t in 1:(nyear)){
+    mu[i, k, t] <- z[i, k, t] * p[i]
+    y[i, k, t] ~ dbin(mu[i, k, t], jmat[i, k, t])
     }
     }
     }
+
     }
