@@ -18,7 +18,10 @@ params <- c("gam",
             "p_phi", 
             "sigma_phi", 
             "p_p",
-            "sigma_p")
+            "sigma_p",
+            "mu_gam",
+            "mu_phi",
+            "p")
 
 
 
