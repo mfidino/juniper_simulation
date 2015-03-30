@@ -8,6 +8,10 @@
 # written by M. Fidino
 
 
+#packages needed
+
+library(plyr)
+library(reshape2)
 
 source("simul_prep_functions.R")
 

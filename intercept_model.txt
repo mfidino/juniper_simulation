@@ -16,13 +16,13 @@ model{
     p_phi ~ dbeta(1, 1)
     mu_phi <- log(p_phi / (1 - p_phi))
     sigma_phi~dunif(0,10)
-    tau_phi<- pow(sigma_phi,-2)
+    tau_phi<- pow(sigma_phi,2)
     
     # p hyperparameters
     p_p ~ dbeta(1, 1)
     mu_p <- log(p_p / (1 - p_p))
     sigma_p ~ dunif(0,10)
-    tau_p <- pow(sigma_p, -2)
+    tau_p <- pow(sigma_p, 2)
     
     
 
