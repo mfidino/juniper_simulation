@@ -191,8 +191,9 @@ sim_jmat <- function(sim_list = NULL, add_NA = TRUE){
 ###----------------------------------------------------------------------------
 
 sim_ymat <- function(sim_list = NULL, jmat = jmat, z = z){
-  ymat <- array(dim = c(nspec, nsite, nyear))
+  
   with(sim_list, {
+    ymat <- array(dim = c(nspec, nsite, nyear))
     for(i in 1:nspec){
       for(k in 1:nsite){
         for(t in 1:nyear){
@@ -220,15 +221,9 @@ sim_ymat <- function(sim_list = NULL, jmat = jmat, z = z){
 #     make_zinit      make_zinit    make_zinit    make_zinit    make_zinit
 ###----------------------------------------------------------------------------
 
-make_zinit <- function(ymat = NULL, simlist = NULL){
-  zinit <- array(dim = c(nspec, nsite, nyear))
-  for(k in 1:nsite){
-    for(i in 1:nspec){
-      for(t in 1:nyear){
-        zinit[i,k,t] <- ymat[i, k, t]
-      }
-    }
-  }
+make_zinit <- function(ymat = NULL){
+  zinit <- ymat
+
   zinit[zinit>0] <- 1
   return(zinit)
 
@@ -247,7 +242,7 @@ sim_matrices <- function(sim_list, add_NA = TRUE){
   z <- sim_z(sim_list)
   jmat <- sim_jmat(sim_list, add_NA = add_NA)
   ymat <- sim_ymat(sim_list, jmat, z)
-  zinit <- make_zinit(ymat, sim_list)
+  zinit <- make_zinit(ymat)
   
   the_mats <- list(z = z,
                    jmat = jmat,
@@ -265,7 +260,9 @@ sim_matrices <- function(sim_list, add_NA = TRUE){
 ###----------------------------------------------------------------------------
 
 sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
-                    add_NA = TRUE){
+                    add_NA = TRUE, actual_gam = NULL, sd_gam = NULL,
+                    actual_phi = NULL, sd_phi = NULL,
+                    actual_p = NULL, sd_p = NULL){
   sim_list <- gen_sim_list(nsite = nsite, nspec = nspec,
                           nyear = nyear, nrep = nrep)
   mats <- sim_matrices(sim_list = sim_list, add_NA = add_NA)
