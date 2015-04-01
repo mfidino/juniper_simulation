@@ -75,9 +75,9 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                    nspec = nspec,
                    nyear = nyear,
                    nrep = nrep,
-                   p = p,
                    gam = gam,
                    phi = phi,
+                   p = p,
                    hyperp_sd = list(gam = sd_gam,
                                  phi = sd_phi,
                                  p = sd_p),
@@ -264,7 +264,10 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
                     actual_phi = NULL, sd_phi = NULL,
                     actual_p = NULL, sd_p = NULL){
   sim_list <- gen_sim_list(nsite = nsite, nspec = nspec,
-                          nyear = nyear, nrep = nrep)
+                          nyear = nyear, nrep = nrep, actual_gam = actual_gam,
+                          sd_gam = sd_gam, actual_phi = actual_phi,
+                          sd_phi = sd_phi, actual_p = actual_p,
+                          sd_p = sd_p)
   mats <- sim_matrices(sim_list = sim_list, add_NA = add_NA)
   
   mats$jmat[which(is.na(mats$jmat)==TRUE)] <- 0
