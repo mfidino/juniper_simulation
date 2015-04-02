@@ -427,10 +427,10 @@ write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
   my_line <- gelman.diag(mod_mcmc)$psrf[,2]
   
   if(iter==1){
-    write(c( "model", names(my_line)),"gelman_diag_table.txt", sep="\t",
+    write(c( "model", names(my_line)),"diagnostic_table.txt", sep="\t",
           ncolumns = (length(my_line)+1))
   }
-  write(c(basic_name, my_line), "gelman_diag_table.txt", sep = "\t",
+  write(c(basic_name, my_line), "diagnostic_table.txt", sep = "\t",
         ncolumns = (length(my_line)+1), append=TRUE)
 }
 
@@ -460,6 +460,7 @@ write_known <- function(one_from_all_sim = all_sim[[i]], iter = i,
                     "add_NA", "percent_to_NA")
   
   if(iter==1){ # write column names
+  
     write(column_names ,"known_values.txt", sep="\t",
           ncolumns = length(column_names))
   }
@@ -493,6 +494,65 @@ write_summary <- function(mod_mcmc = mod_mcmc, iter = i, basic_name = basic_name
   
   write.table(cbind(basic_name, my_line), "mcmc_summary.txt", append = TRUE,
               sep = "\t", col.names = FALSE, row.names = FALSE)
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
+###----------------------------------------------------------------------------
+#     batch_analyze   batch_analyze   batch_analyze   batch_analyze 
+###----------------------------------------------------------------------------
+
+
+
+batch_analyze <- function(all_sim = NULL, params = NULL,
+                          n_chains = NULL, adapt_steps = NULL,
+                          burn_in = NULL, sample_steps = NULL,
+                          thin_steps = NULL){
+  
+  for(i in 1:length(all_sim)){
+    
+    print(paste("Analyzing", i, "of", length(all_sim), "simulations", sep = " "))
+    # generate initial values
+    inits <- function(){ # Must be = instead of <-
+      list( 
+        z = all_sim[[i]]$mats$zinit,
+        p_gam = rbeta(1,1,1),
+        sigma_gam = runif(1, 0, 5),
+        p_phi = rbeta(1,1,1),
+        sigma_phi = runif(1, 0, 5),
+        p_p = rbeta(1, 1, 1)
+      )
+    }
+    
+    
+    
+    mod_mcmc <- as.mcmc.list(run.jags( model="intercept_model.txt" , 
+                                       monitor=params , 
+                                       data=all_sim[[i]]$data_list ,  
+                                       inits=inits , 
+                                       n.chains=n_chains ,
+                                       adapt=adapt_steps ,
+                                       burnin=burn_in , 
+                                       sample=ceiling(sample_steps / n_chains) ,
+                                       thin=thin_steps ,
+                                       summarise=FALSE ,
+                                       plots=FALSE,
+                                       method = "parallel"))
+    
+    # writing out file stuff
+    basic_name <- base_file_name(all_sim[[i]])
+    
+    write_diagnostics(mod_mcmc, iter = i, basic_name = basic_name)
+    
+    write_summary(mod_mcmc, iter = i, basic_name = basic_name)
+    
+    write_known(one_from_all_sim = all_sim[[i]], iter = i, basic_name = basic_name)
+  }
 }
 
 
