@@ -368,6 +368,139 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
 
 
 
+###----------------------------------------------------------------------------
+#     base_file_name    base_file_name    base_file_name    base_file_name
+###----------------------------------------------------------------------------
+
+
+
+base_file_name <- function(one_from_all_sim = NULL){
+  with(one_from_all_sim$sim_list,{
+    if(add_NA){
+      base_name <- paste("gam(", hyperp_mean$gam,",", hyperp_sd$gam,
+                         ")_phi(", hyperp_mean$phi, ",", hyperp_sd$phi,
+                         ")_p(", hyperp_mean$p, ",", hyperp_sd$p, 
+                         ")_NA(", percent_to_NA, ")",
+                         sep = "")
+    }else{
+      base_name <-paste("gam(", hyperp_mean$gam,",", hyperp_sd$gam,
+                        ")_phi(", hyperp_mean$phi, ",", hyperp_sd$phi,
+                        ")_p(", hyperp_mean$p, ",", hyperp_sd$p, 
+                        ")_NA(", "0.0)",
+                        sep = "")
+    }
+    return(base_name)
+  })
+  
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+###----------------------------------------------------------------------------
+#     write_mcmc_matrix   write_mcmc_matrix   write_mcmc_matrix   
+###----------------------------------------------------------------------------
+
+write_mcmc_matrix <- function(mod_mcmc = NULL, basic_name = NULL){
+  mod_mcmc_path <- paste("C:/simulations/dynamic_occupancy/mcmc_matrix/mcmc_matrix_",
+                         basic_name, ".txt", sep = "")
+  write.table(as.matrix(mod_mcmc, chains = TRUE), mod_mcmc_path,
+              row.names = FALSE, sep = "\t")
+  
+}
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+###----------------------------------------------------------------------------
+#     write_diagnostics   write_diagnostics   write_diagnostics  
+###----------------------------------------------------------------------------
+
+# note, this is a sub-function that works within a for loop
+
+write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
+  my_line <- gelman.diag(mod_mcmc)$psrf[,2]
+  
+  if(iter==1){
+    write(c( "model", names(my_line)),"gelman_diag_table.txt", sep="\t",
+          ncolumns = (length(my_line)+1))
+  }
+  write(c(basic_name, my_line), "gelman_diag_table.txt", sep = "\t",
+        ncolumns = (length(my_line)+1), append=TRUE)
+}
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+###----------------------------------------------------------------------------
+#     write_known   write_known   write_known   write_known   write_known   
+###----------------------------------------------------------------------------
+
+
+write_known <- function(one_from_all_sim = all_sim[[i]], iter = i,
+                        basic_name = basic_name){
+  
+  my_line <- c(basic_name, with(one_from_all_sim$sim_list, {
+    c(nspec, nsite, nyear, nrep,
+      hyperp_mean$gam, hyperp_mean$phi, hyperp_mean$p,
+      hyperp_sd$gam, hyperp_sd$phi, hyperp_sd$p,
+      add_NA, percent_to_NA)
+  }
+  ))
+  
+  column_names <- c("model", "nspec", "nsite", "nyear", "nrep",
+                    "mean_gam", "mean_phi", "mean_p",
+                    "gam_sd", "phi_sd", "p_sd",
+                    "add_NA", "percent_to_NA")
+  
+  if(iter==1){ # write column names
+    write(column_names ,"known_values.txt", sep="\t",
+          ncolumns = length(column_names))
+  }
+  
+  write(my_line, "known_values.txt", append = TRUE,
+        sep = "\t", ncolumns = length(column_names))
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
+###----------------------------------------------------------------------------
+#     write_summary   write_summary   write_summary   write_summary 
+###----------------------------------------------------------------------------
+
+
+write_summary <- function(mod_mcmc = mod_mcmc, iter = i, basic_name = basic_name){
+  
+  my_line <- pull_summary(summary(mod_mcmc))
+  
+  column_names <- c("model", names(my_line))
+  
+  if(iter==1){ # write column names
+    write(column_names ,"mcmc_summary.txt", sep="\t",
+          ncolumns = length(column_names))
+  }
+  
+  write.table(cbind(basic_name, my_line), "mcmc_summary.txt", append = TRUE,
+              sep = "\t", col.names = FALSE, row.names = FALSE)
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
 #
 #####
 ######
@@ -386,12 +519,12 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
 
 grab_msd <- function(data = NULL){
   stat <- data$statistics
-  ans <- array(0, dim = c(nrow(stat), 2))
-  for(i in 1:nrow(stat)){
-    ans[i,] <- stat[i, 1:2]
-  }
-  rownames(ans) <- rownames(stat)
-  colnames(ans) <- colnames(stat[,1:2])
+  ans <- array(0, dim = c(nrow(stat), 1))
+    ans <- stat[, 1]
+  
+  ans <- signif(ans, 3)
+  ans <- data.frame(rownames(stat), ans)
+  colnames(ans) <- c("parameter", "mean")
   return(ans)
 }
 
@@ -408,12 +541,11 @@ grab_msd <- function(data = NULL){
 
 grab_quant <- function(data = NULL){
   quant <- data$quantiles
-  ans <- array(0, dim = c(nrow(quant), 2))
-  for(i in 1:nrow(quant)){
-    ans[i,] <- quant[i, c(1,5)]
-  }
+  ans <- array(0, dim = c(nrow(quant), 3))
+  ans <- quant[, c(1,3,5)]
+  ans <- signif(ans, 3)
   rownames(ans) <- rownames(quant)
-  colnames(ans) <- colnames(quant)[c(1,5)]
+  colnames(ans) <- c("lci", "mode", "uci")
   return(ans)
 }
 
@@ -433,7 +565,7 @@ grab_quant <- function(data = NULL){
 pull_summary <- function(data){
   step_one <- grab_msd(data)
   step_two <- grab_quant(data)
-  return(signif(cbind(step_one, step_two), 3))
+  return(data.frame(step_one, step_two))
 }
 
 ###############################################################################
