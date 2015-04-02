@@ -42,19 +42,61 @@ expit <- function(x) {
 make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
                         nrep = NULL, gam = NULL, phi = NULL,
                         p = NULL, gam_sd = NULL, phi_sd = NULL,
-                        p_sd = NULL){
+                        p_sd = NULL, add_NA = NULL, percent_to_NA = NULL){
   if(missing(nspec)|missing(nsite)|missing(nyear)|missing(nrep)|
      missing(gam)|missing(phi)|missing(p)|missing(gam_sd)|missing(phi_sd)|
-     missing(p_sd)){
+     missing(p_sd)|missing(add_NA)|missing(percent_to_NA)){
     stop(c("\n\nSupply all arguments to this function (listed below).\n\n",
            args(make_sim_df)))
   }
   sim_df <- expand.grid(nspec, nsite, nyear, nrep, gam, phi, p, gam_sd,
-                        phi_sd, p_sd)
+                        phi_sd, p_sd, add_NA, percent_to_NA)
   colnames(sim_df) <- c("nspec", "nsite", "nyear", "nrep", "gam",
-                         "phi", "p", "gam_sd", "phi_sd", "p_sd")
+                         "phi", "p", "gam_sd", "phi_sd", "p_sd", "add_NA",
+                        "percent_to_NA")
   return(sim_df)
 }
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+###----------------------------------------------------------------------------
+#     simulate_from_sim_df    simulate_from_sim_df    simulate_from_sim_df 
+###----------------------------------------------------------------------------
+
+
+simulate_from_sd_df <- function(sim_df = NULL, test = FALSE){
+  
+  if(test) sim_df <- sim_df[sample(1:nrow(sim_df), 2),]
+    
+  big_sim <- vector(mode = "list", length = nrow(sim_df))
+  
+  for( i in 1:nrow(sim_df)){
+    
+    big_sim[[i]] <- sim_all(nsite = sim_df$nsite[i], 
+                            nspec = sim_df$nspec[i],
+                            nyear = sim_df$nyear[i],
+                            nrep = sim_df$nrep[i],
+                            actual_gam = sim_df$gam[i],
+                            sd_gam = sim_df$gam_sd[i],
+                            actual_phi = sim_df$phi[i],
+                            sd_phi = sim_df$phi_sd[i],
+                            actual_p = sim_df$p[i], sd_p = sim_df$p_sd[i],
+                            add_NA = sim_df$add_NA[i], 
+                            percent_to_NA = sim_df$percent_to_NA[i] )
+    
+    
+  }
+  
+  return(big_sim)
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 
 
 
@@ -66,7 +108,8 @@ make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
 gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                          nrep = NULL, actual_gam = NULL, sd_gam = NULL,
                          actual_phi = NULL, sd_phi = NULL,
-                         actual_p = NULL, sd_p = NULL){
+                         actual_p = NULL, sd_p = NULL,
+                         add_NA = NULL, percent_to_NA = NULL){
   
   # simulate gamma
   if(missing(actual_gam)) actual_gam <- rbeta(1, 1, 1)
@@ -93,6 +136,12 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
   log_spec_p <- rnorm(nspec, mu_p, sd_p)
   p <- expit(log_spec_p)
   
+   # percent to NA
+  
+  if(missing(add_NA)) add_NA = FALSE
+  
+  if(missing(percent_to_NA)) percent_to_NA <- 0.2
+  
   sim_list <- list(nsite = nsite,
                    nspec = nspec,
                    nyear = nyear,
@@ -105,7 +154,9 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                                  p = sd_p),
                    hyperp_mean = list(gam = actual_gam,
                                  phi = actual_phi,
-                                 p = actual_p)
+                                 p = actual_p),
+                   add_NA = add_NA,
+                   percent_to_NA = percent_to_NA
                    )
   
   return(sim_list)
@@ -180,20 +231,21 @@ sim_z <- function(sim_list = NULL){
 #     sim_jmat    sim_jmat    sim_jmat    sim_jmat    sim_jmat    sim_jmat
 ###----------------------------------------------------------------------------
 
-sim_jmat <- function(sim_list = NULL, add_NA = TRUE){
+sim_jmat <- function(sim_list = NULL){
   with(sim_list, {
     jmat <- array(0, dim = c(nspec, nsite, nyear))
       for(k in 1:nsite){
         for(t in 1:nyear){
-          jmat[,k,t] <- floor(rnorm(1, 18, 2.5))
+          jmat[,k,t] <- floor(rnorm(1, 18, 3))
         }}
     jmat[jmat>nrep] <- nrep # or less than 0
     jmat[jmat<0] <- 0
     
     if(add_NA == TRUE){
-      years <- unique(ceiling(runif(5, 1, nyear)))
+      years <- 1:nyear
       for(i in 1:length(years)){
-        sites <- floor(runif(15, 1, nsite))
+        percent_NA <- ceiling(nsite*percent_to_NA)
+        sites <- sample(1:nsite, percent_NA)
         jmat[,sites,years[i]] <- NA
       }
     }
@@ -260,9 +312,9 @@ make_zinit <- function(ymat = NULL){
 ###----------------------------------------------------------------------------
 
 
-sim_matrices <- function(sim_list, add_NA = TRUE){
+sim_matrices <- function(sim_list){
   z <- sim_z(sim_list)
-  jmat <- sim_jmat(sim_list, add_NA = add_NA)
+  jmat <- sim_jmat(sim_list)
   ymat <- sim_ymat(sim_list, jmat, z)
   zinit <- make_zinit(ymat)
   
@@ -282,21 +334,23 @@ sim_matrices <- function(sim_list, add_NA = TRUE){
 ###----------------------------------------------------------------------------
 
 sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
-                    add_NA = TRUE, actual_gam = NULL, sd_gam = NULL,
+                    actual_gam = NULL, sd_gam = NULL,
                     actual_phi = NULL, sd_phi = NULL,
-                    actual_p = NULL, sd_p = NULL){
+                    actual_p = NULL, sd_p = NULL, add_NA = NULL,
+                    percent_to_NA = NULL){
   sim_list <- gen_sim_list(nsite = nsite, nspec = nspec,
                           nyear = nyear, nrep = nrep, actual_gam = actual_gam,
                           sd_gam = sd_gam, actual_phi = actual_phi,
                           sd_phi = sd_phi, actual_p = actual_p,
-                          sd_p = sd_p)
-  mats <- sim_matrices(sim_list = sim_list, add_NA = add_NA)
+                          sd_p = sd_p, add_NA = add_NA,
+                          percent_to_NA = percent_to_NA)
+  
+  mats <- sim_matrices(sim_list = sim_list)
   
   mats$jmat[which(is.na(mats$jmat)==TRUE)] <- 0
   
   data_list <- list(y = mats$ymat, nsite = nsite, nyear = nyear,
                     nspec = nspec, jmat = mats$jmat)
-  
   
 
   
