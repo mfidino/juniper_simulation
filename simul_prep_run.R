@@ -23,20 +23,10 @@ source("simul_prep_functions.R")
 # simulate the data
 
 
-nsite <- 118
-nspec <- 5
-nyear <- 10
-nrep <- 28
-gam <- c(.1, .5, .9)
-phi <- c(.1, .5, .9)
-p <- c(.1, .5, .9)
-gam_sd <- c(.1, 1, 3)
-phi_sd <- c(.1, 1, 3)
-p_sd <- c(.1, 1, 3)
-
-sim_df <- expand.grid(nsite, nspec, nyear, nrep, gam, phi, p, gam_sd, phi_sd, p_sd)
-colnames(sim_df) <- c("nsite", "nspec", "nyear", "nrep", "gam",
-                      "phi", "p", "gam_sd", "phi_sd", "p_sd")
+sim_df <- make_sim_df(nspec = 5, nsite = 118, nyear = 10, nrep = 28,
+                      gam = c(.1, .5, .9), phi = c(.1, .5, .9),
+                      p = c(.1, .5, .9), gam_sd = c(.1, 1, 3),
+                      phi_sd = c(.1, 1, 3), p_sd = c(.1, 1, 3))
 
 
 

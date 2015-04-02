@@ -34,6 +34,28 @@ expit <- function(x) {
 ###############################################################################
 
 
+###----------------------------------------------------------------------------
+#     make_sim_df   make_sim_df   make_sim_df   make_sim_df   make_sim_df 
+###----------------------------------------------------------------------------
+
+
+make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
+                        nrep = NULL, gam = NULL, phi = NULL,
+                        p = NULL, gam_sd = NULL, phi_sd = NULL,
+                        p_sd = NULL){
+  if(missing(nspec)|missing(nsite)|missing(nyear)|missing(nrep)|
+     missing(gam)|missing(phi)|missing(p)|missing(gam_sd)|missing(phi_sd)|
+     missing(p_sd)){
+    stop(c("\n\nSupply all arguments to this function (listed below).\n\n",
+           args(make_sim_df)))
+  }
+  sim_df <- expand.grid(nspec, nsite, nyear, nrep, gam, phi, p, gam_sd,
+                        phi_sd, p_sd)
+  colnames(sim_df) <- c("nspec", "nsite", "nyear", "nrep", "gam",
+                         "phi", "p", "gam_sd", "phi_sd", "p_sd")
+  return(sim_df)
+}
+
 
 
 ###----------------------------------------------------------------------------
