@@ -46,7 +46,7 @@ model{
     for(k in 1:(nsite)){
     z[i, k, 1] ~ dbern(psi_in[i])
     for(t in 2:(nyear)){
-    logit(psi[i, k, t]) <-  gam[i] * (1 - z[i, k, t-1]) + phi[i] * z[i, k, t-1]
+    logit(psi[i, k, t]) <-  gam[i] + phi[i] * z[i, k, t-1]
     z[i, k, t] ~ dbern(psi[i, k, t])
     }
     }
@@ -70,6 +70,8 @@ model{
     }
     }
     }
-
+for(i in 1:nspec){
+survive <- gam[i] + phi[i]
+}
 
     }

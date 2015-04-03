@@ -67,7 +67,7 @@ make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
 ###----------------------------------------------------------------------------
 
 
-simulate_from_sd_df <- function(sim_df = NULL, test = FALSE){
+simulate_from_sim_df <- function(sim_df = NULL, test = FALSE){
   
   if(test) sim_df <- sim_df[sample(1:nrow(sim_df), 2),]
     
@@ -195,17 +195,17 @@ sim_z <- function(sim_list = NULL){
         
         if (t == 1) { #lpsi = logit of psi
           # just add together colonization
-          lgam <- (1 - z0[k, i])* (logit(gam[i])) #not expit gamma!
+          lgam <- (1 - z0[i, k]) *logit(gam[i]) #not expit gamma!
           # just add together persistence  
           lphi <-  z0[k, i] * (logit(phi[i]))
           # put both of them together in the lpsi matrix  
           lpsi[i, k, 1] <- lgam + lphi
           # expit of logit of psi
           psi[i, k, 1] <- expit(lpsi[i, k, 1])
-          z[i, k, 1] <- rbinom(1, 1, psi[i, k, 1])
+          z[i, k, 1] <- rbinom(1, 1, psi[i, k, t])
         } else {
-          lgam <- (1 - z[i, k, t-1])* (gam[i])
-          lphi <- z[i, k, t - 1] * (phi[i])
+          lgam <-  (1 - z[i, k, t - 1]) * logit(gam[i])
+          lphi <- z[i, k, t - 1] * logit(phi[i])
           lpsi[i, k, t] <- lgam + lphi
           psi[i, k, t] <- expit(lpsi[i, k, t])
           z[i, k, t] <- rbinom(1, 1, psi[i, k, t])
@@ -444,20 +444,22 @@ write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
 
 
 write_known <- function(one_from_all_sim = all_sim[[i]], iter = i,
-                        basic_name = basic_name){
+                        basic_name = basic_name, mod_mcmc = mod_mcmc){
   
   my_line <- c(basic_name, with(one_from_all_sim$sim_list, {
     c(nspec, nsite, nyear, nrep,
-      hyperp_mean$gam, hyperp_mean$phi, hyperp_mean$p,
-      hyperp_sd$gam, hyperp_sd$phi, hyperp_sd$p,
+      gam, logit(hyperp_mean$gam), logit(hyperp_mean$phi),
+      p, hyperp_mean$gam, hyperp_mean$p, hyperp_mean$phi,
+      phi, rep(NA, nspec), 
+      hyperp_sd$gam, hyperp_sd$p, hyperp_sd$phi,
       add_NA, percent_to_NA)
   }
   ))
   
   column_names <- c("model", "nspec", "nsite", "nyear", "nrep",
-                    "mean_gam", "mean_phi", "mean_p",
-                    "gam_sd", "phi_sd", "p_sd",
+                    names(gelman.diag(mod_mcmc)$psrf[,2]),
                     "add_NA", "percent_to_NA")
+  
   
   if(iter==1){ # write column names
   
@@ -551,7 +553,8 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
     
     write_summary(mod_mcmc, iter = i, basic_name = basic_name)
     
-    write_known(one_from_all_sim = all_sim[[i]], iter = i, basic_name = basic_name)
+    write_known(one_from_all_sim = all_sim[[i]], iter = i, basic_name = basic_name,
+                mod_mcmc = mod_mcmc)
   }
 }
 
