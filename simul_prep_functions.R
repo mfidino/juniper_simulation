@@ -34,6 +34,70 @@ expit <- function(x) {
 ###############################################################################
 
 
+###----------------------------------------------------------------------------
+#     make_sim_df   make_sim_df   make_sim_df   make_sim_df   make_sim_df 
+###----------------------------------------------------------------------------
+
+
+make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
+                        nrep = NULL, gam = NULL, phi = NULL,
+                        p = NULL, gam_sd = NULL, phi_sd = NULL,
+                        p_sd = NULL, add_NA = NULL, percent_to_NA = NULL){
+  if(missing(nspec)|missing(nsite)|missing(nyear)|missing(nrep)|
+     missing(gam)|missing(phi)|missing(p)|missing(gam_sd)|missing(phi_sd)|
+     missing(p_sd)|missing(add_NA)|missing(percent_to_NA)){
+    stop(c("\n\nSupply all arguments to this function (listed below).\n\n",
+           args(make_sim_df)))
+  }
+  sim_df <- expand.grid(nspec, nsite, nyear, nrep, gam, phi, p, gam_sd,
+                        phi_sd, p_sd, add_NA, percent_to_NA)
+  colnames(sim_df) <- c("nspec", "nsite", "nyear", "nrep", "gam",
+                         "phi", "p", "gam_sd", "phi_sd", "p_sd", "add_NA",
+                        "percent_to_NA")
+  return(sim_df)
+}
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+###----------------------------------------------------------------------------
+#     simulate_from_sim_df    simulate_from_sim_df    simulate_from_sim_df 
+###----------------------------------------------------------------------------
+
+
+simulate_from_sim_df <- function(sim_df = NULL, test = FALSE){
+  
+  if(test) sim_df <- sim_df[sample(1:nrow(sim_df), 2),]
+    
+  big_sim <- vector(mode = "list", length = nrow(sim_df))
+  
+  for( i in 1:nrow(sim_df)){
+    
+    big_sim[[i]] <- sim_all(nsite = sim_df$nsite[i], 
+                            nspec = sim_df$nspec[i],
+                            nyear = sim_df$nyear[i],
+                            nrep = sim_df$nrep[i],
+                            actual_gam = sim_df$gam[i],
+                            sd_gam = sim_df$gam_sd[i],
+                            actual_phi = sim_df$phi[i],
+                            sd_phi = sim_df$phi_sd[i],
+                            actual_p = sim_df$p[i], sd_p = sim_df$p_sd[i],
+                            add_NA = sim_df$add_NA[i], 
+                            percent_to_NA = sim_df$percent_to_NA[i] )
+    
+    
+  }
+  
+  return(big_sim)
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
 
 
 ###----------------------------------------------------------------------------
@@ -44,7 +108,8 @@ expit <- function(x) {
 gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                          nrep = NULL, actual_gam = NULL, sd_gam = NULL,
                          actual_phi = NULL, sd_phi = NULL,
-                         actual_p = NULL, sd_p = NULL){
+                         actual_p = NULL, sd_p = NULL,
+                         add_NA = NULL, percent_to_NA = NULL){
   
   # simulate gamma
   if(missing(actual_gam)) actual_gam <- rbeta(1, 1, 1)
@@ -71,6 +136,12 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
   log_spec_p <- rnorm(nspec, mu_p, sd_p)
   p <- expit(log_spec_p)
   
+   # percent to NA
+  
+  if(missing(add_NA)) add_NA = FALSE
+  
+  if(missing(percent_to_NA)) percent_to_NA <- 0.2
+  
   sim_list <- list(nsite = nsite,
                    nspec = nspec,
                    nyear = nyear,
@@ -83,7 +154,9 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                                  p = sd_p),
                    hyperp_mean = list(gam = actual_gam,
                                  phi = actual_phi,
-                                 p = actual_p)
+                                 p = actual_p),
+                   add_NA = add_NA,
+                   percent_to_NA = percent_to_NA
                    )
   
   return(sim_list)
@@ -122,17 +195,17 @@ sim_z <- function(sim_list = NULL){
         
         if (t == 1) { #lpsi = logit of psi
           # just add together colonization
-          lgam <- (1 - z0[k, i])* (logit(gam[i])) #not expit gamma!
+          lgam <- (1 - z0[i, k]) *logit(gam[i]) #not expit gamma!
           # just add together persistence  
           lphi <-  z0[k, i] * (logit(phi[i]))
           # put both of them together in the lpsi matrix  
           lpsi[i, k, 1] <- lgam + lphi
           # expit of logit of psi
           psi[i, k, 1] <- expit(lpsi[i, k, 1])
-          z[i, k, 1] <- rbinom(1, 1, psi[i, k, 1])
+          z[i, k, 1] <- rbinom(1, 1, psi[i, k, t])
         } else {
-          lgam <- (1 - z[i, k, t-1])* (gam[i])
-          lphi <- z[i, k, t - 1] * (phi[i])
+          lgam <-  (1 - z[i, k, t - 1]) * logit(gam[i])
+          lphi <- z[i, k, t - 1] * logit(phi[i])
           lpsi[i, k, t] <- lgam + lphi
           psi[i, k, t] <- expit(lpsi[i, k, t])
           z[i, k, t] <- rbinom(1, 1, psi[i, k, t])
@@ -158,20 +231,21 @@ sim_z <- function(sim_list = NULL){
 #     sim_jmat    sim_jmat    sim_jmat    sim_jmat    sim_jmat    sim_jmat
 ###----------------------------------------------------------------------------
 
-sim_jmat <- function(sim_list = NULL, add_NA = TRUE){
+sim_jmat <- function(sim_list = NULL){
   with(sim_list, {
     jmat <- array(0, dim = c(nspec, nsite, nyear))
       for(k in 1:nsite){
         for(t in 1:nyear){
-          jmat[,k,t] <- floor(rnorm(1, 18, 2.5))
+          jmat[,k,t] <- floor(rnorm(1, 18, 3))
         }}
     jmat[jmat>nrep] <- nrep # or less than 0
     jmat[jmat<0] <- 0
     
     if(add_NA == TRUE){
-      years <- unique(ceiling(runif(5, 1, nyear)))
+      years <- 1:nyear
       for(i in 1:length(years)){
-        sites <- floor(runif(15, 1, nsite))
+        percent_NA <- ceiling(nsite*percent_to_NA)
+        sites <- sample(1:nsite, percent_NA)
         jmat[,sites,years[i]] <- NA
       }
     }
@@ -238,9 +312,9 @@ make_zinit <- function(ymat = NULL){
 ###----------------------------------------------------------------------------
 
 
-sim_matrices <- function(sim_list, add_NA = TRUE){
+sim_matrices <- function(sim_list){
   z <- sim_z(sim_list)
-  jmat <- sim_jmat(sim_list, add_NA = add_NA)
+  jmat <- sim_jmat(sim_list)
   ymat <- sim_ymat(sim_list, jmat, z)
   zinit <- make_zinit(ymat)
   
@@ -260,21 +334,23 @@ sim_matrices <- function(sim_list, add_NA = TRUE){
 ###----------------------------------------------------------------------------
 
 sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
-                    add_NA = TRUE, actual_gam = NULL, sd_gam = NULL,
+                    actual_gam = NULL, sd_gam = NULL,
                     actual_phi = NULL, sd_phi = NULL,
-                    actual_p = NULL, sd_p = NULL){
+                    actual_p = NULL, sd_p = NULL, add_NA = NULL,
+                    percent_to_NA = NULL){
   sim_list <- gen_sim_list(nsite = nsite, nspec = nspec,
                           nyear = nyear, nrep = nrep, actual_gam = actual_gam,
                           sd_gam = sd_gam, actual_phi = actual_phi,
                           sd_phi = sd_phi, actual_p = actual_p,
-                          sd_p = sd_p)
-  mats <- sim_matrices(sim_list = sim_list, add_NA = add_NA)
+                          sd_p = sd_p, add_NA = add_NA,
+                          percent_to_NA = percent_to_NA)
+  
+  mats <- sim_matrices(sim_list = sim_list)
   
   mats$jmat[which(is.na(mats$jmat)==TRUE)] <- 0
   
   data_list <- list(y = mats$ymat, nsite = nsite, nyear = nyear,
                     nspec = nspec, jmat = mats$jmat)
-  
   
 
   
@@ -290,6 +366,202 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
 ###############################################################################
 ###############################################################################
 
+
+
+###----------------------------------------------------------------------------
+#     base_file_name    base_file_name    base_file_name    base_file_name
+###----------------------------------------------------------------------------
+
+
+
+base_file_name <- function(one_from_all_sim = NULL){
+  with(one_from_all_sim$sim_list,{
+    if(add_NA){
+      base_name <- paste("gam(", hyperp_mean$gam,",", hyperp_sd$gam,
+                         ")_phi(", hyperp_mean$phi, ",", hyperp_sd$phi,
+                         ")_p(", hyperp_mean$p, ",", hyperp_sd$p, 
+                         ")_NA(", percent_to_NA, ")",
+                         sep = "")
+    }else{
+      base_name <-paste("gam(", hyperp_mean$gam,",", hyperp_sd$gam,
+                        ")_phi(", hyperp_mean$phi, ",", hyperp_sd$phi,
+                        ")_p(", hyperp_mean$p, ",", hyperp_sd$p, 
+                        ")_NA(", "0.0)",
+                        sep = "")
+    }
+    return(base_name)
+  })
+  
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+###----------------------------------------------------------------------------
+#     write_mcmc_matrix   write_mcmc_matrix   write_mcmc_matrix   
+###----------------------------------------------------------------------------
+
+write_mcmc_matrix <- function(mod_mcmc = NULL, basic_name = NULL){
+  mod_mcmc_path <- paste("C:/simulations/dynamic_occupancy/mcmc_matrix/mcmc_matrix_",
+                         basic_name, ".txt", sep = "")
+  write.table(as.matrix(mod_mcmc, chains = TRUE), mod_mcmc_path,
+              row.names = FALSE, sep = "\t")
+  
+}
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+###----------------------------------------------------------------------------
+#     write_diagnostics   write_diagnostics   write_diagnostics  
+###----------------------------------------------------------------------------
+
+# note, this is a sub-function that works within a for loop
+
+write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
+  my_line <- gelman.diag(mod_mcmc)$psrf[,2]
+  
+  if(iter==1){
+    write(c( "model", names(my_line)),"diagnostic_table.txt", sep="\t",
+          ncolumns = (length(my_line)+1))
+  }
+  write(c(basic_name, my_line), "diagnostic_table.txt", sep = "\t",
+        ncolumns = (length(my_line)+1), append=TRUE)
+}
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+###----------------------------------------------------------------------------
+#     write_known   write_known   write_known   write_known   write_known   
+###----------------------------------------------------------------------------
+
+
+write_known <- function(one_from_all_sim = all_sim[[i]], iter = i,
+                        basic_name = basic_name, mod_mcmc = mod_mcmc){
+  
+  my_line <- c(basic_name, with(one_from_all_sim$sim_list, {
+    c(nspec, nsite, nyear, nrep,
+      gam, logit(hyperp_mean$gam), logit(hyperp_mean$phi),
+      p, hyperp_mean$gam, hyperp_mean$p, hyperp_mean$phi,
+      phi, rep(NA, nspec), 
+      hyperp_sd$gam, hyperp_sd$p, hyperp_sd$phi,
+      add_NA, percent_to_NA)
+  }
+  ))
+  
+  column_names <- c("model", "nspec", "nsite", "nyear", "nrep",
+                    names(gelman.diag(mod_mcmc)$psrf[,2]),
+                    "add_NA", "percent_to_NA")
+  
+  
+  if(iter==1){ # write column names
+  
+    write(column_names ,"known_values.txt", sep="\t",
+          ncolumns = length(column_names))
+  }
+  
+  write(my_line, "known_values.txt", append = TRUE,
+        sep = "\t", ncolumns = length(column_names))
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
+###----------------------------------------------------------------------------
+#     write_summary   write_summary   write_summary   write_summary 
+###----------------------------------------------------------------------------
+
+
+write_summary <- function(mod_mcmc = mod_mcmc, iter = i, basic_name = basic_name){
+  
+  my_line <- pull_summary(summary(mod_mcmc))
+  
+  column_names <- c("model", names(my_line))
+  
+  if(iter==1){ # write column names
+    write(column_names ,"mcmc_summary.txt", sep="\t",
+          ncolumns = length(column_names))
+  }
+  
+  write.table(cbind(basic_name, my_line), "mcmc_summary.txt", append = TRUE,
+              sep = "\t", col.names = FALSE, row.names = FALSE)
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
+###----------------------------------------------------------------------------
+#     batch_analyze   batch_analyze   batch_analyze   batch_analyze 
+###----------------------------------------------------------------------------
+
+
+
+batch_analyze <- function(all_sim = NULL, params = NULL,
+                          n_chains = NULL, adapt_steps = NULL,
+                          burn_in = NULL, sample_steps = NULL,
+                          thin_steps = NULL){
+  
+  for(i in 1:length(all_sim)){
+    
+    print(paste("Analyzing", i, "of", length(all_sim), "simulations", sep = " "))
+    # generate initial values
+    inits <- function(){ # Must be = instead of <-
+      list( 
+        z = all_sim[[i]]$mats$zinit,
+        p_gam = rbeta(1,1,1),
+        sigma_gam = runif(1, 0, 5),
+        p_phi = rbeta(1,1,1),
+        sigma_phi = runif(1, 0, 5),
+        p_p = rbeta(1, 1, 1)
+      )
+    }
+    
+    
+    
+    mod_mcmc <- as.mcmc.list(run.jags( model="intercept_model.txt" , 
+                                       monitor=params , 
+                                       data=all_sim[[i]]$data_list ,  
+                                       inits=inits , 
+                                       n.chains=n_chains ,
+                                       adapt=adapt_steps ,
+                                       burnin=burn_in , 
+                                       sample=ceiling(sample_steps / n_chains) ,
+                                       thin=thin_steps ,
+                                       summarise=FALSE ,
+                                       plots=FALSE,
+                                       method = "parallel"))
+    
+    # writing out file stuff
+    basic_name <- base_file_name(all_sim[[i]])
+    
+    write_diagnostics(mod_mcmc, iter = i, basic_name = basic_name)
+    
+    write_summary(mod_mcmc, iter = i, basic_name = basic_name)
+    
+    write_known(one_from_all_sim = all_sim[[i]], iter = i, basic_name = basic_name,
+                mod_mcmc = mod_mcmc)
+  }
+}
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 
 
 #
@@ -310,12 +582,12 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
 
 grab_msd <- function(data = NULL){
   stat <- data$statistics
-  ans <- array(0, dim = c(nrow(stat), 2))
-  for(i in 1:nrow(stat)){
-    ans[i,] <- stat[i, 1:2]
-  }
-  rownames(ans) <- rownames(stat)
-  colnames(ans) <- colnames(stat[,1:2])
+  ans <- array(0, dim = c(nrow(stat), 1))
+    ans <- stat[, 1]
+  
+  ans <- signif(ans, 3)
+  ans <- data.frame(rownames(stat), ans)
+  colnames(ans) <- c("parameter", "mean")
   return(ans)
 }
 
@@ -332,12 +604,11 @@ grab_msd <- function(data = NULL){
 
 grab_quant <- function(data = NULL){
   quant <- data$quantiles
-  ans <- array(0, dim = c(nrow(quant), 2))
-  for(i in 1:nrow(quant)){
-    ans[i,] <- quant[i, c(1,5)]
-  }
+  ans <- array(0, dim = c(nrow(quant), 3))
+  ans <- quant[, c(1,3,5)]
+  ans <- signif(ans, 3)
   rownames(ans) <- rownames(quant)
-  colnames(ans) <- colnames(quant)[c(1,5)]
+  colnames(ans) <- c("lci", "mode", "uci")
   return(ans)
 }
 
@@ -357,7 +628,7 @@ grab_quant <- function(data = NULL){
 pull_summary <- function(data){
   step_one <- grab_msd(data)
   step_two <- grab_quant(data)
-  return(signif(cbind(step_one, step_two), 3))
+  return(data.frame(step_one, step_two))
 }
 
 ###############################################################################
