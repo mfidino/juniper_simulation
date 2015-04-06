@@ -27,7 +27,7 @@ sim_df <- make_sim_df(nspec = 5, nsite = 118, nyear = 5, nrep = 28,
                       gam = c(.1, .5, .9), phi = c(.1, .5, .9),
                       p = c(.1, .5, .9), gam_sd = c(.1, 1, 3),
                       phi_sd = c(.1, 1, 3), p_sd = c(.1, 1, 3),
-                      add_NA = FALSE, percent_to_NA = 0.2)
+                      add_NA = FALSE, percent_to_NA = 0.2, row_replicate = 1)
 
 
 

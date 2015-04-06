@@ -42,7 +42,8 @@ expit <- function(x) {
 make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
                         nrep = NULL, gam = NULL, phi = NULL,
                         p = NULL, gam_sd = NULL, phi_sd = NULL,
-                        p_sd = NULL, add_NA = NULL, percent_to_NA = NULL){
+                        p_sd = NULL, add_NA = NULL, percent_to_NA = NULL,
+                        row_replicate = 1){
   if(missing(nspec)|missing(nsite)|missing(nyear)|missing(nrep)|
      missing(gam)|missing(phi)|missing(p)|missing(gam_sd)|missing(phi_sd)|
      missing(p_sd)|missing(add_NA)|missing(percent_to_NA)){
@@ -54,6 +55,9 @@ make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
   colnames(sim_df) <- c("nspec", "nsite", "nyear", "nrep", "gam",
                          "phi", "p", "gam_sd", "phi_sd", "p_sd", "add_NA",
                         "percent_to_NA")
+  
+  if(row_replicate>1) sim_df <- sim_df[rep(row.names(sim_df), row_replicate),]
+  
   return(sim_df)
 }
 
@@ -377,9 +381,9 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
 base_file_name <- function(one_from_all_sim = NULL){
   with(one_from_all_sim$sim_list,{
     if(add_NA){
-      base_name <- paste("gam(", hyperp_mean$gam,",", hyperp_sd$gam,
-                         ")_phi(", hyperp_mean$phi, ",", hyperp_sd$phi,
-                         ")_p(", hyperp_mean$p, ",", hyperp_sd$p, 
+      base_name <- paste("gam(", hyperp_mean$gam,"_", hyperp_sd$gam,
+                         ")_phi(", hyperp_mean$phi, "_", hyperp_sd$phi,
+                         ")_p(", hyperp_mean$p, "_", hyperp_sd$p, 
                          ")_NA(", percent_to_NA, ")",
                          sep = "")
     }else{
@@ -430,7 +434,7 @@ write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
     write(c( "model", names(my_line)),"diagnostic_table.txt", sep="\t",
           ncolumns = (length(my_line)+1))
   }
-  write(c(basic_name, my_line), "diagnostic_table.txt", sep = "\t",
+  write(c(paste(basic_name,"iter", i, sep = "_"), my_line), "diagnostic_table.txt", sep = "\t",
         ncolumns = (length(my_line)+1), append=TRUE)
 }
 
@@ -446,7 +450,7 @@ write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
 write_known <- function(one_from_all_sim = all_sim[[i]], iter = i,
                         basic_name = basic_name, mod_mcmc = mod_mcmc){
   
-  my_line <- c(basic_name, with(one_from_all_sim$sim_list, {
+  my_line <- c(paste(basic_name,"iter", i, sep = "_"), with(one_from_all_sim$sim_list, {
     c(nspec, nsite, nyear, nrep,
       gam, logit(hyperp_mean$gam), logit(hyperp_mean$phi),
       p, hyperp_mean$gam, hyperp_mean$p, hyperp_mean$phi,
@@ -494,7 +498,7 @@ write_summary <- function(mod_mcmc = mod_mcmc, iter = i, basic_name = basic_name
           ncolumns = length(column_names))
   }
   
-  write.table(cbind(basic_name, my_line), "mcmc_summary.txt", append = TRUE,
+  write.table(cbind(paste(basic_name,"iter", i, sep = "_"), my_line), "mcmc_summary.txt", append = TRUE,
               sep = "\t", col.names = FALSE, row.names = FALSE)
 }
 
