@@ -182,7 +182,7 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
 
 
 sim_z <- function(sim_list = NULL){
-  with(sim_list,{
+  z <- with(sim_list,{
   # initial occupancy states
   # makes a nsite * species matrix for the first season z0
   phi0 <- runif(nspec, .1, .9)
@@ -193,7 +193,7 @@ sim_z <- function(sim_list = NULL){
   # subsequent occupancy
   # makes a nsite by species by year for the following years
   z <- array(dim = c(nspec, nsite, nyear))
-  lpsi <- array(dim = c(nspec, nsite, nyear))
+  logit_psi <- array(dim = c(nspec, nsite, nyear))
   psi <- array(dim = c(nspec, nsite, nyear))
   
   for(t in 1:nyear) {
@@ -206,7 +206,7 @@ sim_z <- function(sim_list = NULL){
           # just add together persistence  
           logit_phi <-  z0[i, k] * (logit(phi[i]))
           # put both of them together in the lpsi matrix  
-          logit_psi[i, k, 1] <- logit_gam + logit)phi
+          logit_psi[i, k, 1] <- logit_gam + logit_phi
           # expit of logit of psi
           psi[i, k, 1] <- expit(logit_psi[i, k, 1])
           z[i, k, 1] <- rbinom(1, 1, psi[i, k, t])
@@ -433,7 +433,7 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
                     nspec = nspec, jmat = mats$j_list$jmat)
   
   comparison_list <- list(y = mats$y_list$ymat_comparison, nsite = nsite, nyear = nyear,
-                          nspec = nspec, jmat = mats$j_list$jmat)
+                          nspec = nspec, jmat = mats$j_list$jmat_comparison)
   
 
   
@@ -598,29 +598,35 @@ write_summary <- function(mod_mcmc = mod_mcmc, iter = i, basic_name = basic_name
 batch_analyze <- function(all_sim = NULL, params = NULL,
                           n_chains = NULL, adapt_steps = NULL,
                           burn_in = NULL, sample_steps = NULL,
-                          thin_steps = NULL){
+                          thin_steps = NULL, make_comparisons = NULL){
   
   for(i in 1:length(all_sim)){
     
     print(paste("Analyzing", i, "of", length(all_sim), "simulations", sep = " "))
+    if(make_comparisons) print("Analyzing data_list")
     # generate initial values
+    
     inits <- function(){ # Must be = instead of <-
       list( 
         z = all_sim[[i]]$mats$zinit,
-        p_gam = rbeta(1,1,1),
+        p_gam = rbeta(1, 1, 1),
         sigma_gam = runif(1, 0, 5),
-        p_phi = rbeta(1,1,1),
+        p_phi = rbeta(1, 1, 1),
         sigma_phi = runif(1, 0, 5),
         p_p = rbeta(1, 1, 1)
       )
     }
     
+    init_list <- vector(mode = "list", length = n_chains)
+    for(chain in 1:n_chains){
+      init_list[[chain]] <- inits()
+    }
     
     
     mod_mcmc <- as.mcmc.list(run.jags( model="intercept_model.txt" , 
                                        monitor=params , 
                                        data=all_sim[[i]]$data_list ,  
-                                       inits=inits , 
+                                       inits=init_list , 
                                        n.chains=n_chains ,
                                        adapt=adapt_steps ,
                                        burnin=burn_in , 
@@ -639,6 +645,30 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
     
     write_known(one_from_all_sim = all_sim[[i]], iter = i, basic_name = basic_name,
                 mod_mcmc = mod_mcmc)
+    
+    if(make_comparisons){
+      print("Analyzing with comparison_list")
+      mod_mcmc_compare <- as.mcmc.list(run.jags( model="intercept_model.txt" , 
+                                         monitor=params , 
+                                         data=all_sim[[i]]$comparison_list,  
+                                         inits=init_list , 
+                                         n.chains=n_chains ,
+                                         adapt=adapt_steps ,
+                                         burnin=burn_in , 
+                                         sample=ceiling(sample_steps / n_chains) ,
+                                         thin=thin_steps ,
+                                         summarise=FALSE ,
+                                         plots=FALSE,
+                                         method = "parallel"))
+      compare_i <- 2
+      write_diagnostics(mod_mcmc_compare, iter = compare_i, basic_name = basic_name)
+      
+      write_summary(mod_mcmc_compare, iter = compare_i, basic_name = basic_name)
+      
+      write_known(one_from_all_sim = all_sim[[i]], iter = compare_i, 
+                  basic_name = basic_name,
+                  mod_mcmc = mod_mcmc_compare)
+    }
   }
 }
 
