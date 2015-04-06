@@ -28,6 +28,11 @@ sim_df <- make_sim_df(nspec = 5, nsite = 118, nyear = 5, nrep = 28,
                       p = c(.1, .5, .9), gam_sd = c(.1, 1, 3),
                       phi_sd = c(.1, 1, 3), p_sd = c(.1, 1, 3),
                       add_NA = FALSE, percent_to_NA = 0.2, row_replicate = 1)
+# for our comparison stuff
+sim_df <- make_sim_df(nspec = 5, nsite = 118, nyear = 5, nrep = 28,
+                      gam = .4, phi = .7, p = .1, gam_sd = 1,
+                      phi_sd = 1, p_sd = 1, add_NA = FALSE, percent_to_NA = 0.2,
+                      row_replicate = 10)
 
 
 
@@ -52,6 +57,7 @@ params <- c("gam",
 
   
 start_time <- Sys.time()
-batch_analyze(all_sim = all_sim, params = params, n_chains = 5,adapt_steps = 1000,
-                burn_in = 1000, sample_steps = 1000, thin_steps = 2)
+batch_analyze(all_sim = list(all_sim[[1]]), params = params, n_chains = 4,adapt_steps = 3000,
+                burn_in = 15000, sample_steps = 25000, thin_steps = 1,
+              make_comparisons = TRUE)
 end_time <- Sys.time()

@@ -514,7 +514,7 @@ write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
     write(c( "model", names(my_line)),"diagnostic_table.txt", sep="\t",
           ncolumns = (length(my_line)+1))
   }
-  write(c(paste(basic_name,"iter", i, sep = "_"), my_line), "diagnostic_table.txt", sep = "\t",
+  write(c(paste(basic_name,"iter", iter, sep = "_"), my_line), "diagnostic_table.txt", sep = "\t",
         ncolumns = (length(my_line)+1), append=TRUE)
 }
 
@@ -530,7 +530,7 @@ write_diagnostics <- function(mod_mcmc, iter = i, basic_name = basic_name){
 write_known <- function(one_from_all_sim = all_sim[[i]], iter = i,
                         basic_name = basic_name, mod_mcmc = mod_mcmc){
   
-  my_line <- c(paste(basic_name,"iter", i, sep = "_"), with(one_from_all_sim$sim_list, {
+  my_line <- c(paste(basic_name,"iter", iter, sep = "_"), with(one_from_all_sim$sim_list, {
     c(nspec, nsite, nyear, nrep,
       gam, logit(hyperp_mean$gam), logit(hyperp_mean$phi),
       p, hyperp_mean$gam, hyperp_mean$p, hyperp_mean$phi,
@@ -578,7 +578,7 @@ write_summary <- function(mod_mcmc = mod_mcmc, iter = i, basic_name = basic_name
           ncolumns = length(column_names))
   }
   
-  write.table(cbind(paste(basic_name,"iter", i, sep = "_"), my_line), "mcmc_summary.txt", append = TRUE,
+  write.table(cbind(paste(basic_name,"iter", iter, sep = "_"), my_line), "mcmc_summary.txt", append = TRUE,
               sep = "\t", col.names = FALSE, row.names = FALSE)
 }
 
@@ -606,6 +606,7 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
     if(make_comparisons) print("Analyzing data_list")
     # generate initial values
     
+ 
     inits <- function(){ # Must be = instead of <-
       list( 
         z = all_sim[[i]]$mats$zinit,
@@ -617,16 +618,13 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
       )
     }
     
-    init_list <- vector(mode = "list", length = n_chains)
-    for(chain in 1:n_chains){
-      init_list[[chain]] <- inits()
-    }
+
     
     
     mod_mcmc <- as.mcmc.list(run.jags( model="intercept_model.txt" , 
                                        monitor=params , 
                                        data=all_sim[[i]]$data_list ,  
-                                       inits=init_list , 
+                                       inits=inits , 
                                        n.chains=n_chains ,
                                        adapt=adapt_steps ,
                                        burnin=burn_in , 
@@ -651,7 +649,7 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
       mod_mcmc_compare <- as.mcmc.list(run.jags( model="intercept_model.txt" , 
                                          monitor=params , 
                                          data=all_sim[[i]]$comparison_list,  
-                                         inits=init_list , 
+                                         inits=inits , 
                                          n.chains=n_chains ,
                                          adapt=adapt_steps ,
                                          burnin=burn_in , 
