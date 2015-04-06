@@ -160,7 +160,10 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                                  phi = actual_phi,
                                  p = actual_p),
                    add_NA = add_NA,
-                   percent_to_NA = percent_to_NA
+                   percent_to_NA = percent_to_NA,
+                   l_gam = log_spec_gam,
+                   l_phi = log_spec_phi,
+                   l_p = log_spec_p
                    )
   
   return(sim_list)
@@ -199,19 +202,19 @@ sim_z <- function(sim_list = NULL){
         
         if (t == 1) { #lpsi = logit of psi
           # just add together colonization
-          lgam <- (1 - z0[i, k]) *logit(gam[i]) #not expit gamma!
+          logit_gam <- (1 - z0[i, k]) *logit(gam[i]) #not expit gamma!
           # just add together persistence  
-          lphi <-  z0[i, k] * (logit(phi[i]))
+          logit_phi <-  z0[i, k] * (logit(phi[i]))
           # put both of them together in the lpsi matrix  
-          lpsi[i, k, 1] <- lgam + lphi
+          logit_psi[i, k, 1] <- logit_gam + logit)phi
           # expit of logit of psi
-          psi[i, k, 1] <- expit(lpsi[i, k, 1])
+          psi[i, k, 1] <- expit(logit_psi[i, k, 1])
           z[i, k, 1] <- rbinom(1, 1, psi[i, k, t])
         } else {
-          lgam <-  (1 - z[i, k, t - 1]) * logit(gam[i])
-          lphi <- z[i, k, t - 1] * logit(phi[i])
-          lpsi[i, k, t] <- lgam + lphi
-          psi[i, k, t] <- expit(lpsi[i, k, t])
+          logit_gam <-  (1 - z[i, k, t - 1]) * logit(gam[i])
+          logit_phi <- z[i, k, t - 1] * logit(phi[i])
+          logit_psi[i, k, t] <- logit_gam + logit_phi
+          psi[i, k, t] <- expit(logit_psi[i, k, t])
           z[i, k, t] <- rbinom(1, 1, psi[i, k, t])
         }
       }
@@ -423,8 +426,8 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
   
   mats <- sim_matrices(sim_list = sim_list)
   
-  mats$j_list$jmat[which(is.na(mats$jmat)==TRUE)] <- 0
-  mats$j_list$jmat_comparison[which(is.na(mats$jmat)==TRUE)] <- 0
+  mats$j_list$jmat[which(is.na(mats$j_list$jmat)==TRUE)] <- 0
+  mats$j_list$jmat_comparison[which(is.na(mats$j_list$jmat)==TRUE)] <- 0
   
   data_list <- list(y = mats$y_list$ymat, nsite = nsite, nyear = nyear,
                     nspec = nspec, jmat = mats$j_list$jmat)
