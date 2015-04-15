@@ -725,6 +725,7 @@ grab_quant <- function(data = NULL){
 ###----------------------------------------------------------------------------
 
 pull_summary <- function(data){
+  if(class(data) == "mcmc.list") data <- summary(data)
   step_one <- grab_msd(data)
   step_two <- grab_quant(data)
   return(data.frame(step_one, step_two))
