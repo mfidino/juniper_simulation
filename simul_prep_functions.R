@@ -240,19 +240,25 @@ sim_z <- function(sim_list = NULL){
 
 sim_jmat <- function(sim_list = NULL){
   with(sim_list, {
-    jmat_expanded <- array(0, dim = c(nspec, nsite, nyear, nrep))
-    
-    for(k in 1:nsite){
-      for(t in 1:nyear){
-        n_samp <- floor(rnorm(1, 18, 3))
-        if(n_samp >= 28) n_samp <- 28
-        if(n_samp < 0) n_samp <- 1
-        if(n_samp > 0){
-        to_add <- sort(c(1,sample(2:28, n_samp-1)))
-        jmat_expanded[,k,t,to_add] <- 1
+    days_array <- array(0, dim = c(nrep, nsite, nyear))
+    camera_prob <- c(0.45, 0.72, 0.81, 0.84, 0.83, 0.81, 0.82, 0.81, 0.86, 0.88, 
+                     0.88, 0.87, 0.87, 0.89, 0.92, 0.94, 0.93, 0.92, 0.90, 0.89,
+                     0.89, 0.89, 0.89, 0.88, 0.88, 0.87, 0.86, 0.84, 0.85, 0.85)
+
+        
+        n_samp <- rbinom(nsite * nyear, 30, camera_prob)
+        n_samp[n_samp>28] <- 28 
+        n_list <- lapply(n_samp, function(x) sort(c(1, sample(2:28, x-1))))
+        
+        to_start <- 0
+        for(i in 1:length(n_list)){
+          days_array[to_start+n_list[[i]]] <- 1
+          to_start <- to_start+ nrep
         }
-        }
-      }
+        
+        days_array <- aperm(days_array, c(2,3,1))
+        jmat_expanded <- array(rep(days_array, each = nspec),
+                               dim = c(nspec, nsite, nyear, nrep))
     
     
     jmat <- array(0, dim = c(nspec, nsite, nyear))
@@ -275,15 +281,7 @@ sim_jmat <- function(sim_list = NULL){
       }
     }
     
-    if(add_NA == TRUE){
-      years <- 1:nyear
-      for(i in 1:length(years)){
-        percent_NA <- ceiling(nsite*percent_to_NA)
-        sites <- sample(1:nsite, percent_NA)
-        jmat[,sites,years[i]] <- NA
-        jmat_comparison[,sites, years[i]] <- NA
-      }
-    }
+
     
     j_list <- list(jmat = jmat, 
                    jmat_comparison = jmat_comparison, 
@@ -306,33 +304,11 @@ sim_jmat <- function(sim_list = NULL){
 sim_ymat <- function(sim_list = NULL, j_list = j_list, z = z){
   
   with(sim_list, {
-    ymat_expanded <- array(dim = c(nspec, nsite, nyear, nrep))
-    for(i in 1:nspec){
-      for(k in 1:nsite){
-        for(t in 1:nyear){
-          for(j in 1:nrep){
-          if(is.na(j_list$jmat[i,k,t])==TRUE){
-            ymat_expanded[i,k,t,] <- NA
-          }else{
-          ymat_expanded[i,k,t,j] <- rbinom(1, j_list$jmat_expanded[i, k, t, j], 
-                                           p[i] * z[i, k, t])
-          } # end else
-        } # end t
-      } # end j
-    } # end i
-    }
-    ymat <- array(dim = c(nspec, nsite, nyear))
-    for(i in 1:nspec){
-      for(k in 1:nsite){
-        for(t in 1:nyear){
-          if(is.na(j_list$jmat[i,k,t])==TRUE){
-            ymat[i,k,t] <- NA
-            }else{
-          ymat[i,k,t] <- sum(ymat_expanded[i, k, t, ], na.rm = TRUE)
-          }
-        }
-      }
-    }
+    ymat_expanded <- array(rbinom(n = nspec*nsite*nyear*nrep, size = j_list$jmat_expanded, 
+                  prob = rep(p * z, nrep)), dim = c(nspec, nsite, nyear, nrep))
+    
+    ymat <- array(apply(ymat_expanded, c(1,2,3), sum), dim = c(nspec, nsite, nyear))
+    
     weeks <- rep(1:4, each = 7)
     
     ymat_comparison <- array(dim = c(nspec, nsite, nyear))
@@ -344,15 +320,12 @@ sim_ymat <- function(sim_list = NULL, j_list = j_list, z = z){
             sum_by_week[i, k, t, j] <- ifelse(sum(ymat_expanded[i, k, t, which(weeks==j)], 
                                            na.rm = TRUE)>=1, 1, 0)
           }
-          if(is.na(j_list$jmat[i,k,t])==TRUE){
-            ymat_comparison[i,k,t] <- NA
-          }else{
             ymat_comparison[i, k, t] <- sum(sum_by_week[i, k, t, ])
           
           }
         }
       }
-    }
+    
     
     y_list <- list(ymat = ymat, ymat_comparison = ymat_comparison, 
                    ymat_expanded = ymat_expanded)
@@ -394,6 +367,20 @@ sim_matrices <- function(sim_list = NULL){
   z <- sim_z(sim_list)
   j_list <- sim_jmat(sim_list)
   y_list <- sim_ymat(sim_list, j_list, z)
+  
+  
+  
+      if(sim_list$add_NA == TRUE){
+        years <- 1:sim_list$nyear
+        for(i in 1:length(years)){
+          percent_NA <- ceiling(sim_list$nsite*sim_list$percent_to_NA)
+          sites <- sample(1:sim_list$nsite, percent_NA)
+          j_list$jmat[,sites,years[i]] <- NA
+          j_list$jmat_comparison[,sites, years[i]] <- NA
+          y_list$ymat[,sites, years[i]] <- NA
+          y_list$ymat_comparison[,sites, years[i]] <- NA
+        }
+      }
   zinit <- make_zinit(y_list)
   
   the_mats <- list(z = z,
@@ -427,7 +414,7 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
   mats <- sim_matrices(sim_list = sim_list)
   
   mats$j_list$jmat[which(is.na(mats$j_list$jmat)==TRUE)] <- 0
-  mats$j_list$jmat_comparison[which(is.na(mats$j_list$jmat)==TRUE)] <- 0
+  mats$j_list$jmat_comparison[which(is.na(mats$j_list$jmat_comparison)==TRUE)] <- 0
   
   data_list <- list(y = mats$y_list$ymat, nsite = nsite, nyear = nyear,
                     nspec = nspec, jmat = mats$j_list$jmat)
