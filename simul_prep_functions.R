@@ -43,18 +43,16 @@ make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
                         nrep = NULL, gam = NULL, phi = NULL,
                         p = NULL, gam_sd = NULL, phi_sd = NULL,
                         p_sd = NULL, add_NA = NULL, percent_to_NA = NULL,
-                        row_replicate = 1){
+                        cut_off = NULL, row_replicate = 1){
   if(missing(nspec)|missing(nsite)|missing(nyear)|missing(nrep)|
      missing(gam)|missing(phi)|missing(p)|missing(gam_sd)|missing(phi_sd)|
-     missing(p_sd)|missing(add_NA)|missing(percent_to_NA)){
+     missing(p_sd)|missing(add_NA)|missing(percent_to_NA)|missing(cut_off)){
     stop(c("\n\nSupply all arguments to this function (listed below).\n\n",
-           args(make_sim_df)))
+           formals(make_sim_df)))
   }
   sim_df <- expand.grid(nspec, nsite, nyear, nrep, gam, phi, p, gam_sd,
-                        phi_sd, p_sd, add_NA, percent_to_NA)
-  colnames(sim_df) <- c("nspec", "nsite", "nyear", "nrep", "gam",
-                         "phi", "p", "gam_sd", "phi_sd", "p_sd", "add_NA",
-                        "percent_to_NA")
+                        phi_sd, p_sd, add_NA, percent_to_NA, cut_off)
+  colnames(sim_df) <- head(names(formals(make_sim_df)), -1)
   
   if(row_replicate>1) sim_df <- sim_df[rep(row.names(sim_df), row_replicate),]
   
@@ -89,7 +87,8 @@ simulate_from_sim_df <- function(sim_df = NULL, test = FALSE){
                             sd_phi = sim_df$phi_sd[i],
                             actual_p = sim_df$p[i], sd_p = sim_df$p_sd[i],
                             add_NA = sim_df$add_NA[i], 
-                            percent_to_NA = sim_df$percent_to_NA[i] )
+                            percent_to_NA = sim_df$percent_to_NA[i],
+                            cut_off = sim_df$cut_off[i])
     
     
   }
@@ -113,7 +112,8 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                          nrep = NULL, actual_gam = NULL, sd_gam = NULL,
                          actual_phi = NULL, sd_phi = NULL,
                          actual_p = NULL, sd_p = NULL,
-                         add_NA = NULL, percent_to_NA = NULL){
+                         add_NA = NULL, percent_to_NA = NULL, 
+                         cut_off = NULL){
   
   # simulate gamma
   if(missing(actual_gam)) actual_gam <- rbeta(1, 1, 1)
@@ -142,9 +142,12 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
   
    # percent to NA
   
-  if(missing(add_NA)) add_NA = FALSE
+  if(missing(add_NA)) add_NA <- FALSE
   
   if(missing(percent_to_NA)) percent_to_NA <- 0.2
+  
+  # cutoff
+  if(missing(cut_off)) cut_off <- 0
   
   sim_list <- list(nsite = nsite,
                    nspec = nspec,
@@ -163,7 +166,8 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                    percent_to_NA = percent_to_NA,
                    l_gam = log_spec_gam,
                    l_phi = log_spec_phi,
-                   l_p = log_spec_p
+                   l_p = log_spec_p,
+                   cut_off = cut_off
                    )
   
   return(sim_list)
@@ -246,7 +250,7 @@ sim_jmat <- function(sim_list = NULL){
                      0.89, 0.89, 0.89, 0.88, 0.88, 0.87, 0.86, 0.84, 0.85, 0.85)
 
         
-        n_samp <- rbinom(nsite * nyear, 30, camera_prob)
+        n_samp <- rbinom(nsite * nyear, length(camera_prob), camera_prob)
         n_samp[n_samp>28] <- 28 
         n_list <- lapply(n_samp, function(x) sort(c(1, sample(2:28, x-1))))
         
@@ -262,10 +266,7 @@ sim_jmat <- function(sim_list = NULL){
     
     
     jmat <- array(0, dim = c(nspec, nsite, nyear))
-      for(k in 1:nsite){
-        for(t in 1:nyear){
-          jmat[,k,t] <- rowSums(jmat_expanded[,k,t,])
-        }}
+    jmat <- apply(jmat_expanded, c(2,3), rowSums)
     
     weeks <- rep(1:4, each = 7)
     weeks_to_sum_by <- array(0, dim = c(nspec, nsite, nyear, 4))
@@ -274,12 +275,12 @@ sim_jmat <- function(sim_list = NULL){
     for(k in 1:nsite){
       for(t in 1:nyear){
         for(j in 1:4){
-          weeks_to_sum_by[,k, t, j] <- ifelse(rowSums(jmat_expanded[,k, t, which(weeks==j)])[1]>0,
-                                              1, 0)
-        }
-      jmat_comparison[, k, t] <- rowSums(weeks_to_sum_by[,k, t, ])
+          weeks_to_sum_by[,k, t, j] <- ifelse(rowSums(jmat_expanded[,k, t, which(weeks==j)])[1]>0,                                              1, 0)
+        }     
       }
     }
+    jmat_comparison <- apply(weeks_to_sum_by, c(2, 3), rowSums)
+    jmat_comparison[which(jmat<cut_off)] <- 0
     
 
     
@@ -312,19 +313,15 @@ sim_ymat <- function(sim_list = NULL, j_list = j_list, z = z){
     weeks <- rep(1:4, each = 7)
     
     ymat_comparison <- array(dim = c(nspec, nsite, nyear))
-    sum_by_week <- array(dim = c(nspec, nsite, nyear, 4))
-    for(i in 1:nspec){
-      for(k in 1:nsite){
-        for(t in 1:nyear){
-          for(j in 1:4){
-            sum_by_week[i, k, t, j] <- ifelse(sum(ymat_expanded[i, k, t, which(weeks==j)], 
-                                           na.rm = TRUE)>=1, 1, 0)
-          }
-            ymat_comparison[i, k, t] <- sum(sum_by_week[i, k, t, ])
-          
-          }
-        }
-      }
+    sum_by_week <- array(0, dim = c(nspec, nsite, nyear, 4))
+
+    for(j in 1:4){
+      sum_by_week[,,,j] <- apply(ymat_expanded[,,,which(weeks==j)],c(1,2,3), sum)
+    }
+    sum_by_week[sum_by_week>0] <- 1
+    
+    ymat_comparison <- apply(sum_by_week, c(1,2,3), sum)
+    ymat_comparison[which(j_list$jmat_comparison==0)] <- 0
     
     
     y_list <- list(ymat = ymat, ymat_comparison = ymat_comparison, 
@@ -403,13 +400,14 @@ sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
                     actual_gam = NULL, sd_gam = NULL,
                     actual_phi = NULL, sd_phi = NULL,
                     actual_p = NULL, sd_p = NULL, add_NA = NULL,
-                    percent_to_NA = NULL){
+                    percent_to_NA = NULL, cut_off = NULL){
   sim_list <- gen_sim_list(nsite = nsite, nspec = nspec,
                           nyear = nyear, nrep = nrep, actual_gam = actual_gam,
                           sd_gam = sd_gam, actual_phi = actual_phi,
                           sd_phi = sd_phi, actual_p = actual_p,
                           sd_p = sd_p, add_NA = add_NA,
-                          percent_to_NA = percent_to_NA)
+                          percent_to_NA = percent_to_NA,
+                          cut_off = cut_off)
   
   mats <- sim_matrices(sim_list = sim_list)
   
@@ -594,15 +592,30 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
     # generate initial values
     
  
-    inits <- function(){ # Must be = instead of <-
-      list( 
-        z = all_sim[[i]]$mats$zinit,
-        p_gam = rbeta(1, 1, 1),
-        sigma_gam = runif(1, 0, 5),
-        p_phi = rbeta(1, 1, 1),
-        sigma_phi = runif(1, 0, 5),
-        p_p = rbeta(1, 1, 1)
-      )
+    inits <- function(chain){
+      gen_list <- function(chain = chain){
+        list( 
+          z = all_sim[[i]]$mats$zinit,
+          p_gam = rbeta(1, 1, 1),
+          sigma_gam = runif(1, 0, 5),
+          p_phi = rbeta(1, 1, 1),
+          sigma_phi = runif(1, 0, 5),
+          p_p = rbeta(1, 1, 1),
+          .RNG.name = switch(chain,
+                             "1" = "base::Wichmann-Hill",
+                             "2" = "base::Marsaglia-Multicarry",
+                             "3" = "base::Super-Duper",
+                             "4" = "base::Mersenne-Twister"),
+          .RNG.seed = sample(1:1e+06, 1)
+          )
+      }
+      return(switch(chain,           
+        "1" = gen_list(chain),
+        "2" = gen_list(chain),
+        "3" = gen_list(chain),
+        "4" = gen_list(chain)
+        )
+        )
     }
     
 
