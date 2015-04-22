@@ -42,7 +42,8 @@ expit <- function(x) {
 make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
                         nrep = NULL, gam = NULL, phi = NULL,
                         p = NULL, gam_sd = NULL, phi_sd = NULL,
-                        p_sd = NULL, add_NA = NULL, percent_to_NA = NULL,
+                        p_sd = NULL, beta = NULL, beta_sd = NULL,
+                        add_NA = NULL, percent_to_NA = NULL,
                         cut_off = NULL, row_replicate = 1){
   if(missing(nspec)|missing(nsite)|missing(nyear)|missing(nrep)|
      missing(gam)|missing(phi)|missing(p)|missing(gam_sd)|missing(phi_sd)|
@@ -50,8 +51,9 @@ make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
     stop(c("\n\nSupply all arguments to this function (listed below).\n\n",
            formals(make_sim_df)))
   }
+  if(missing(beta)) beta <- beta_sd <- 0
   sim_df <- expand.grid(nspec, nsite, nyear, nrep, gam, phi, p, gam_sd,
-                        phi_sd, p_sd, add_NA, percent_to_NA, cut_off)
+                        phi_sd, p_sd, beta, beta_sd, add_NA, percent_to_NA, cut_off)
   colnames(sim_df) <- head(names(formals(make_sim_df)), -1)
   
   if(row_replicate>1) sim_df <- sim_df[rep(row.names(sim_df), row_replicate),]
@@ -86,6 +88,8 @@ simulate_from_sim_df <- function(sim_df = NULL, test = FALSE){
                             actual_phi = sim_df$phi[i],
                             sd_phi = sim_df$phi_sd[i],
                             actual_p = sim_df$p[i], sd_p = sim_df$p_sd[i],
+                            actual_beta = sim_df$beta[i],
+                            sd_beta = sim_df$beta_sd[i],
                             add_NA = sim_df$add_NA[i], 
                             percent_to_NA = sim_df$percent_to_NA[i],
                             cut_off = sim_df$cut_off[i])
@@ -112,8 +116,8 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                          nrep = NULL, actual_gam = NULL, sd_gam = NULL,
                          actual_phi = NULL, sd_phi = NULL,
                          actual_p = NULL, sd_p = NULL,
-                         add_NA = NULL, percent_to_NA = NULL, 
-                         cut_off = NULL){
+                         actual_beta = NULL, sd_beta = NULL, add_NA = NULL, 
+                         percent_to_NA = NULL, cut_off = NULL){
   
   # simulate gamma
   if(missing(actual_gam)) actual_gam <- rbeta(1, 1, 1)
@@ -140,6 +144,18 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
   log_spec_p <- rnorm(nspec, mu_p, sd_p)
   p <- expit(log_spec_p)
   
+  # beta
+  if(missing(actual_beta)) actual_beta <- 0 ; mu_beta <- 0 ; sd_beta <- 0
+  
+  #beta_sd
+  if(missing(sd_beta)) sd_beta <- 0
+  
+  if(actual_beta>0){
+    mu_beta <- logit(beta)
+    log_spec_beta <- rnorm(nspec, mu_phi, sd_beta)
+    beta <- expit(log_spec_beta)
+  }else{mu_beta <- 0 ; beta <- 0; log_spec_beta <- rep(0, nspec)} 
+  
    # percent to NA
   
   if(missing(add_NA)) add_NA <- FALSE
@@ -149,6 +165,7 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
   # cutoff
   if(missing(cut_off)) cut_off <- 0
   
+  
   sim_list <- list(nsite = nsite,
                    nspec = nspec,
                    nyear = nyear,
@@ -156,17 +173,21 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                    gam = gam,
                    phi = phi,
                    p = p,
+                   beta = beta,
                    hyperp_sd = list(gam = sd_gam,
                                  phi = sd_phi,
-                                 p = sd_p),
+                                 p = sd_p,
+                                 beta = sd_beta),
                    hyperp_mean = list(gam = actual_gam,
                                  phi = actual_phi,
-                                 p = actual_p),
+                                 p = actual_p,
+                                 beta = actual_beta),
                    add_NA = add_NA,
                    percent_to_NA = percent_to_NA,
                    l_gam = log_spec_gam,
                    l_phi = log_spec_phi,
                    l_p = log_spec_p,
+                   l_beta = log_spec_beta,
                    cut_off = cut_off
                    )
   
@@ -206,17 +227,17 @@ sim_z <- function(sim_list = NULL){
         
         if (t == 1) { #lpsi = logit of psi
           # just add together colonization
-          logit_gam <- (1 - z0[i, k]) *logit(gam[i]) #not expit gamma!
+          logit_gam <- (1 - z0[i, k]) *l_gam[i] + (1 - z0[i, k]) * l_beta[i]  
           # just add together persistence  
-          logit_phi <-  z0[i, k] * (logit(phi[i]))
+          logit_phi <-  z0[i, k] * (l_phi[i])
           # put both of them together in the lpsi matrix  
           logit_psi[i, k, 1] <- logit_gam + logit_phi
           # expit of logit of psi
           psi[i, k, 1] <- expit(logit_psi[i, k, 1])
           z[i, k, 1] <- rbinom(1, 1, psi[i, k, t])
         } else {
-          logit_gam <-  (1 - z[i, k, t - 1]) * logit(gam[i])
-          logit_phi <- z[i, k, t - 1] * logit(phi[i])
+          logit_gam <-  (1 - z[i, k, t - 1]) * l_gam[i] + (1 - z[i, k, t - 1]) * l_beta[i]
+          logit_phi <- z[i, k, t - 1] * l_phi[i]
           logit_psi[i, k, t] <- logit_gam + logit_phi
           psi[i, k, t] <- expit(logit_psi[i, k, t])
           z[i, k, t] <- rbinom(1, 1, psi[i, k, t])
@@ -399,13 +420,15 @@ sim_matrices <- function(sim_list = NULL){
 sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
                     actual_gam = NULL, sd_gam = NULL,
                     actual_phi = NULL, sd_phi = NULL,
-                    actual_p = NULL, sd_p = NULL, add_NA = NULL,
+                    actual_p = NULL, sd_p = NULL,
+                    actual_beta = NULL, sd_beta = NULL, add_NA = NULL,
                     percent_to_NA = NULL, cut_off = NULL){
   sim_list <- gen_sim_list(nsite = nsite, nspec = nspec,
                           nyear = nyear, nrep = nrep, actual_gam = actual_gam,
                           sd_gam = sd_gam, actual_phi = actual_phi,
                           sd_phi = sd_phi, actual_p = actual_p,
-                          sd_p = sd_p, add_NA = add_NA,
+                          sd_p = sd_p, actual_beta = actual_beta,
+                          sd_beta = sd_beta, add_NA = add_NA,
                           percent_to_NA = percent_to_NA,
                           cut_off = cut_off)
   
