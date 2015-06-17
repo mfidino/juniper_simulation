@@ -42,23 +42,19 @@ expit <- function(x) {
 make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
                         nrep = NULL, gam = NULL, phi = NULL,
                         p = NULL, gam_sd = NULL, phi_sd = NULL,
-                        p_sd = NULL, beta = NULL, beta_sd = NULL, 
-                        beta2 = NULL, beta_sd2 = NULL, inxs = NULL, inxs_sd = NULL,
-                        add_NA = NULL, percent_to_NA = NULL,
-                        cut_off = NULL, row_replicate = 1){
+                        p_sd = NULL, add_NA = NULL, percent_to_NA = NULL,
+                        row_replicate = 1){
   if(missing(nspec)|missing(nsite)|missing(nyear)|missing(nrep)|
      missing(gam)|missing(phi)|missing(p)|missing(gam_sd)|missing(phi_sd)|
-     missing(p_sd)|missing(add_NA)|missing(percent_to_NA)|missing(cut_off)){
+     missing(p_sd)|missing(add_NA)|missing(percent_to_NA)){
     stop(c("\n\nSupply all arguments to this function (listed below).\n\n",
-           formals(make_sim_df)))
+           args(make_sim_df)))
   }
-  if(missing(beta)) beta <- beta_sd <- 0
-  if(missing(beta2)) beta2 <- beta_sd2 <- 0
-  if(missing(inxs)) inxs <- inxs_sd <- 0
   sim_df <- expand.grid(nspec, nsite, nyear, nrep, gam, phi, p, gam_sd,
-                        phi_sd, p_sd, beta, beta_sd, beta2, beta_sd2, inxs, inxs_sd, add_NA, 
-                        percent_to_NA, cut_off)
-  colnames(sim_df) <- head(names(formals(make_sim_df)), -1)
+                        phi_sd, p_sd, add_NA, percent_to_NA)
+  colnames(sim_df) <- c("nspec", "nsite", "nyear", "nrep", "gam",
+                         "phi", "p", "gam_sd", "phi_sd", "p_sd", "add_NA",
+                        "percent_to_NA")
   
   if(row_replicate>1) sim_df <- sim_df[rep(row.names(sim_df), row_replicate),]
   
@@ -75,8 +71,7 @@ make_sim_df <- function(nspec = NULL, nsite = NULL, nyear = NULL,
 ###----------------------------------------------------------------------------
 
 
-simulate_from_sim_df <- function(sim_df = NULL, test = FALSE,
-                                 known_inxs = NULL){
+simulate_from_sim_df <- function(sim_df = NULL, test = FALSE){
   
   if(test) sim_df <- sim_df[sample(1:nrow(sim_df), 2),]
     
@@ -93,16 +88,8 @@ simulate_from_sim_df <- function(sim_df = NULL, test = FALSE,
                             actual_phi = sim_df$phi[i],
                             sd_phi = sim_df$phi_sd[i],
                             actual_p = sim_df$p[i], sd_p = sim_df$p_sd[i],
-                            actual_beta = sim_df$beta[i],
-                            sd_beta = sim_df$beta_sd[i],
-                            actual_beta2 = sim_df$beta2[i],
-                            sd_beta2 = sim_df$beta_sd[i],
-                            actual_inxs = sim_df$inxs[i],
-                            sd_inxs = sim_df$inxs_sd[i],
                             add_NA = sim_df$add_NA[i], 
-                            percent_to_NA = sim_df$percent_to_NA[i],
-                            cut_off = sim_df$cut_off[i],
-                            known_inxs = known_inxs)
+                            percent_to_NA = sim_df$percent_to_NA[i] )
     
     
   }
@@ -126,10 +113,7 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                          nrep = NULL, actual_gam = NULL, sd_gam = NULL,
                          actual_phi = NULL, sd_phi = NULL,
                          actual_p = NULL, sd_p = NULL,
-                         actual_beta = NULL, sd_beta = NULL,
-                         actual_beta2 = NULL, sd_beta2 = NULL,
-                         actual_inxs = NULL, sd_inxs = NULL, add_NA = NULL, 
-                         percent_to_NA = NULL, cut_off = NULL){
+                         add_NA = NULL, percent_to_NA = NULL){
   
   # simulate gamma
   if(missing(actual_gam)) actual_gam <- rbeta(1, 1, 1)
@@ -156,62 +140,11 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
   log_spec_p <- rnorm(nspec, mu_p, sd_p)
   p <- expit(log_spec_p)
   
-  # beta
-  if(missing(actual_beta)){
-  actual_beta <- 0
-  mu_beta <- 0
-  sd_beta <- 0
-  }
-  
-  
-  if(actual_beta>0){
-    mu_beta <- logit(actual_beta)
-    log_spec_beta <- rnorm(nspec, mu_beta, sd_beta)
-    beta <- expit(log_spec_beta)
-    covar <- rnorm(nsite)
-  }else{mu_beta <- 0 ; beta <- rep(0, nspec); log_spec_beta <- rep(0, nspec); covar <- rep(0, nsite)} 
-  
-  
-  # beta
-  if(missing(actual_beta2)){
-    actual_beta2 <- 0
-    mu_beta2 <- 0
-    sd_beta2 <- 0
-  }
-  
-  
-  if(actual_beta2>0){
-    mu_beta2 <- logit(actual_beta2)
-    log_spec_beta2 <- rnorm(nspec, mu_beta2, sd_beta2)
-    beta2 <- expit(log_spec_beta2)
-  }else{mu_beta2 <- 0 ; beta2 <- rep(0, nspec); log_spec_beta2 <- rep(0, nspec)} 
-  
-  if(missing(actual_inxs)){
-    sd_inxs <- 0
-  }
-  
-  if(is.numeric(actual_inxs) & is.numeric(sd_inxs)){
-    mu_inxs <- 0
-    n_inxs <- (nspec^2) - nspec
-    log_spec_inxs <- rnorm(n_inxs, mu_inxs, sd_inxs)
-    inxs <- expit(log_spec_inxs)
-  }else{mu_inxs <- sd_inxs <- 0; n_inxs <- (nspec^2) - nspec; inxs <- rep(0, n_inxs); log_spec_inxs <- rep(0, n_inxs)}
-  
-
-  
    # percent to NA
   
-  if(missing(add_NA)) add_NA <- FALSE
+  if(missing(add_NA)) add_NA = FALSE
   
   if(missing(percent_to_NA)) percent_to_NA <- 0.2
-  
-  # cutoff
-  if(missing(cut_off)) cut_off <- 0
-  
-  l_phi_mat <- diag(log_spec_phi)
-  l_phi_mat[which(l_phi_mat==0)] <- log_spec_inxs
-  l_phi_mat <- t(l_phi_mat)
-  
   
   sim_list <- list(nsite = nsite,
                    nspec = nspec,
@@ -220,32 +153,17 @@ gen_sim_list <- function(nsite = NULL, nspec = NULL, nyear = NULL,
                    gam = gam,
                    phi = phi,
                    p = p,
-                   beta = beta,
-                   beta2 = beta,
-                   inxs = inxs,
                    hyperp_sd = list(gam = sd_gam,
                                  phi = sd_phi,
-                                 p = sd_p,
-                                 beta = sd_beta,
-                                 beta2 = sd_beta2,
-                                 inxs = sd_inxs),
+                                 p = sd_p),
                    hyperp_mean = list(gam = actual_gam,
                                  phi = actual_phi,
-                                 p = actual_p,
-                                 beta = actual_beta,
-                                 beta2 = actual_beta2,
-                                 inxs = actual_inxs),
+                                 p = actual_p),
                    add_NA = add_NA,
                    percent_to_NA = percent_to_NA,
                    l_gam = log_spec_gam,
                    l_phi = log_spec_phi,
-                   l_p = log_spec_p,
-                   l_beta = log_spec_beta,
-                   l_beta2 = log_spec_beta2,
-                   l_inxs = log_spec_inxs,
-                   cut_off = cut_off,
-                   covar = covar,
-                   l_phi_mat = l_phi_mat
+                   l_p = log_spec_p
                    )
   
   return(sim_list)
@@ -267,31 +185,41 @@ sim_z <- function(sim_list = NULL){
   z <- with(sim_list,{
   # initial occupancy states
   # makes a nsite * species matrix for the first season z0
-    
-  z <- array(dim = c(nspec, nsite, nyear))
-  logit_psi <- array(dim = c(nspec, nsite, nyear))
-  psi <- array(dim = c(nspec, nsite, nyear))
-    
-  psi1 <- runif(nspec, .1, .9)
+  phi0 <- runif(nspec, .1, .9)
+  z0 <- array(dim = c(nspec, nsite))
   for (i in 1:nspec) {
-    z[i,,1] <- rbinom(nsite, 1, psi1[i])
+    z0[i,] <- rbinom(nsite, 1, phi0[i])
   }
   # subsequent occupancy
   # makes a nsite by species by year for the following years
-
-
-  for(t in 2:nyear) {
+  z <- array(dim = c(nspec, nsite, nyear))
+  logit_psi <- array(dim = c(nspec, nsite, nyear))
+  psi <- array(dim = c(nspec, nsite, nyear))
+  
+  for(t in 1:nyear) {
     for (k in 1:nsite) {
       for (i in 1:nspec) {
-          logit_gam <-  (1 - z[i, k, t - 1]) * l_gam[i] + (1 - z[i, k, t - 1]) * l_beta[i] * covar[k]
-          logit_phi <- (z[, k, t - 1] %*% l_phi_mat[i,] + l_beta2[i] * covar[k]) * z[i, k, t - 1]
+        
+        if (t == 1) { #lpsi = logit of psi
+          # just add together colonization
+          logit_gam <- (1 - z0[i, k]) *logit(gam[i]) #not expit gamma!
+          # just add together persistence  
+          logit_phi <-  z0[i, k] * (logit(phi[i]))
+          # put both of them together in the lpsi matrix  
+          logit_psi[i, k, 1] <- logit_gam + logit_phi
+          # expit of logit of psi
+          psi[i, k, 1] <- expit(logit_psi[i, k, 1])
+          z[i, k, 1] <- rbinom(1, 1, psi[i, k, t])
+        } else {
+          logit_gam <-  (1 - z[i, k, t - 1]) * logit(gam[i])
+          logit_phi <- z[i, k, t - 1] * logit(phi[i])
           logit_psi[i, k, t] <- logit_gam + logit_phi
           psi[i, k, t] <- expit(logit_psi[i, k, t])
           z[i, k, t] <- rbinom(1, 1, psi[i, k, t])
         }
       }
     }
-  
+  }
 
   return(z) 
   })
@@ -318,7 +246,7 @@ sim_jmat <- function(sim_list = NULL){
                      0.89, 0.89, 0.89, 0.88, 0.88, 0.87, 0.86, 0.84, 0.85, 0.85)
 
         
-        n_samp <- rbinom(nsite * nyear, length(camera_prob), camera_prob)
+        n_samp <- rbinom(nsite * nyear, 30, camera_prob)
         n_samp[n_samp>28] <- 28 
         n_list <- lapply(n_samp, function(x) sort(c(1, sample(2:28, x-1))))
         
@@ -334,7 +262,10 @@ sim_jmat <- function(sim_list = NULL){
     
     
     jmat <- array(0, dim = c(nspec, nsite, nyear))
-    jmat <- apply(jmat_expanded, c(2,3), rowSums)
+      for(k in 1:nsite){
+        for(t in 1:nyear){
+          jmat[,k,t] <- rowSums(jmat_expanded[,k,t,])
+        }}
     
     weeks <- rep(1:4, each = 7)
     weeks_to_sum_by <- array(0, dim = c(nspec, nsite, nyear, 4))
@@ -343,12 +274,12 @@ sim_jmat <- function(sim_list = NULL){
     for(k in 1:nsite){
       for(t in 1:nyear){
         for(j in 1:4){
-          weeks_to_sum_by[,k, t, j] <- ifelse(rowSums(jmat_expanded[,k, t, which(weeks==j)])[1]>0,                                              1, 0)
-        }     
+          weeks_to_sum_by[,k, t, j] <- ifelse(rowSums(jmat_expanded[,k, t, which(weeks==j)])[1]>0,
+                                              1, 0)
+        }
+      jmat_comparison[, k, t] <- rowSums(weeks_to_sum_by[,k, t, ])
       }
     }
-    jmat_comparison <- apply(weeks_to_sum_by, c(2, 3), rowSums)
-    jmat_comparison[which(jmat<cut_off)] <- 0
     
 
     
@@ -381,15 +312,19 @@ sim_ymat <- function(sim_list = NULL, j_list = j_list, z = z){
     weeks <- rep(1:4, each = 7)
     
     ymat_comparison <- array(dim = c(nspec, nsite, nyear))
-    sum_by_week <- array(0, dim = c(nspec, nsite, nyear, 4))
-
-    for(j in 1:4){
-      sum_by_week[,,,j] <- apply(ymat_expanded[,,,which(weeks==j)],c(1,2,3), sum)
-    }
-    sum_by_week[sum_by_week>0] <- 1
-    
-    ymat_comparison <- apply(sum_by_week, c(1,2,3), sum)
-    ymat_comparison[which(j_list$jmat_comparison==0)] <- 0
+    sum_by_week <- array(dim = c(nspec, nsite, nyear, 4))
+    for(i in 1:nspec){
+      for(k in 1:nsite){
+        for(t in 1:nyear){
+          for(j in 1:4){
+            sum_by_week[i, k, t, j] <- ifelse(sum(ymat_expanded[i, k, t, which(weeks==j)], 
+                                           na.rm = TRUE)>=1, 1, 0)
+          }
+            ymat_comparison[i, k, t] <- sum(sum_by_week[i, k, t, ])
+          
+          }
+        }
+      }
     
     
     y_list <- list(ymat = ymat, ymat_comparison = ymat_comparison, 
@@ -418,37 +353,6 @@ make_zinit <- function(y_list = NULL){
   return(zinit)
 
 }
-
-###############################################################################
-###############################################################################
-###############################################################################
-
-###----------------------------------------------------------------------------
-#     make_inxs   make_inxs   make_inxs   make_inxs   make_inxs   make_inxs
-###----------------------------------------------------------------------------
-
-
-
-make_inxs <- function(sim_list = NULL){
-  with(sim_list,{  
-  rows <- rep(c(1:nspec), each = nspec)
-  cols <- rep(c(1:nspec), nspec)
-  t_mat <- (nspec^2)
-  inm <- matrix(1:t_mat, ncol = nspec)
-  minus_inm <- matrix(c(rep(1:(nspec-1), each = (nspec + 1)), 0), ncol = nspec)
-  inm <- inm - minus_inm
-  diag(inm) <- 1
-  inxs <- as.vector(inm)
-  
-  return(list(rows_vec = rows,
-              cols_vec = cols,
-              inxs_vec = inxs))
-  
-  })
-  
-  
-}
-
 
 ###############################################################################
 ###############################################################################
@@ -498,56 +402,25 @@ sim_matrices <- function(sim_list = NULL){
 sim_all <- function(nsite = NULL, nspec = NULL, nyear = NULL, nrep = NULL,
                     actual_gam = NULL, sd_gam = NULL,
                     actual_phi = NULL, sd_phi = NULL,
-                    actual_p = NULL, sd_p = NULL,
-                    actual_beta = NULL, sd_beta = NULL,
-                    actual_beta2 = NULL, sd_beta2 = NULL,
-                    actual_inxs = NULL, sd_inxs = NULL, add_NA = NULL,
-                    percent_to_NA = NULL, cut_off = NULL,
-                    known_inxs = NULL){
+                    actual_p = NULL, sd_p = NULL, add_NA = NULL,
+                    percent_to_NA = NULL){
   sim_list <- gen_sim_list(nsite = nsite, nspec = nspec,
                           nyear = nyear, nrep = nrep, actual_gam = actual_gam,
                           sd_gam = sd_gam, actual_phi = actual_phi,
                           sd_phi = sd_phi, actual_p = actual_p,
-                          sd_p = sd_p, actual_beta = actual_beta,
-                          sd_beta = sd_beta, actual_beta2 = actual_beta2,
-                          sd_beta2 = sd_beta2, actual_inxs = actual_inxs,
-                          sd_inxs = sd_inxs, add_NA = add_NA,
-                          percent_to_NA = percent_to_NA,
-                          cut_off = cut_off)
-  
-  if(length(known_inxs>1)){
-    sim_list$l_phi_mat <- matrix(known_inxs, ncol = sim_list$nspec, nrow = sim_list$nspec)
-    diag(sim_list$l_phi_mat) <- sim_list$l_phi
-  }
+                          sd_p = sd_p, add_NA = add_NA,
+                          percent_to_NA = percent_to_NA)
   
   mats <- sim_matrices(sim_list = sim_list)
   
   mats$j_list$jmat[which(is.na(mats$j_list$jmat)==TRUE)] <- 0
   mats$j_list$jmat_comparison[which(is.na(mats$j_list$jmat_comparison)==TRUE)] <- 0
   
-  if(length(unique(sim_list$covar))>1){
-    
-    data_list <- c(list(y = mats$y_list$ymat, nsite = nsite, nyear = nyear,
-                      nspec = nspec, jmat = mats$j_list$jmat, cov = sim_list$covar,
-                      n_inxs = nspec^2, only_inxs = (nspec^2 - nspec)),
-                   make_inxs(sim_list))
-    
-    comparison_list <- c(list(y = mats$y_list$ymat_comparison, nsite = nsite, nyear = nyear,
-                            nspec = nspec, jmat = mats$j_list$jmat_comparison,
-                            cov = sim_list$covar, n_inxs = nspec^2, only_inxs = (nspec^2 - nspec)),
-                         make_inxs(sim_list))
-  }else{
-    data_list <- c(list(y = mats$y_list$ymat, nsite = nsite, nyear = nyear,
-                          nspec = nspec, jmat = mats$j_list$jmat,
-                        n_inxs = nspec^2, only_inxs = (nspec^2 - nspec)),
-                   make_inxs(sim_list))
-
+  data_list <- list(y = mats$y_list$ymat, nsite = nsite, nyear = nyear,
+                    nspec = nspec, jmat = mats$j_list$jmat)
   
-    comparison_list <- c(list(y = mats$y_list$ymat_comparison, nsite = nsite, nyear = nyear,
-                          nspec = nspec, jmat = mats$j_list$jmat_comparison,
-                          n_inxs = nspec^2, only_inxs = (nspec^2 - nspec)),
-                         make_inxs(sim_list))
-  }
+  comparison_list <- list(y = mats$y_list$ymat_comparison, nsite = nsite, nyear = nyear,
+                          nspec = nspec, jmat = mats$j_list$jmat_comparison)
   
 
   
@@ -712,8 +585,7 @@ write_summary <- function(mod_mcmc = mod_mcmc, iter = i, basic_name = basic_name
 batch_analyze <- function(all_sim = NULL, params = NULL,
                           n_chains = NULL, adapt_steps = NULL,
                           burn_in = NULL, sample_steps = NULL,
-                          thin_steps = NULL, make_comparisons = NULL,
-                          model = NULL){
+                          thin_steps = NULL, make_comparisons = NULL){
   
   for(i in 1:length(all_sim)){
     
@@ -722,44 +594,21 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
     # generate initial values
     
  
-    inits <- function(chain){
-      gen_list <- function(chain = chain){
-        list( 
-          z = all_sim[[i]]$mats$zinit,
-          p_gam = rbeta(1, 1, 1),
-          sigma_gam = runif(1, 0, 5),
-          p_phi = rbeta(1, 1, 1),
-          sigma_phi = runif(1, 0, 5),
-          p_p = rbeta(1, 1, 1),
-          .RNG.name = switch(chain,
-                             "1" = "base::Wichmann-Hill",
-                             "2" = "base::Marsaglia-Multicarry",
-                             "3" = "base::Super-Duper",
-                             "4" = "base::Mersenne-Twister",
-                             "5" = "base::Wichmann-Hill",
-                             "6" = "base::Marsaglia-Multicarry",
-                             "7" = "base::Super-Duper",
-                             "8" = "base::Mersenne-Twister"),
-          .RNG.seed = sample(1:1e+06, 1)
-          )
-      }
-      return(switch(chain,           
-        "1" = gen_list(chain),
-        "2" = gen_list(chain),
-        "3" = gen_list(chain),
-        "4" = gen_list(chain),
-        "5" = gen_list(chain),
-        "6" = gen_list(chain),
-        "7" = gen_list(chain),
-        "8" = gen_list(chain)
-        )
-        )
+    inits <- function(){ # Must be = instead of <-
+      list( 
+        z = all_sim[[i]]$mats$zinit,
+        p_gam = rbeta(1, 1, 1),
+        sigma_gam = runif(1, 0, 5),
+        p_phi = rbeta(1, 1, 1),
+        sigma_phi = runif(1, 0, 5),
+        p_p = rbeta(1, 1, 1)
+      )
     }
     
 
     
-
-    mod_mcmc <- as.mcmc.list(run.jags( model= model , 
+    
+    mod_mcmc <- as.mcmc.list(run.jags( model="intercept_model.txt" , 
                                        monitor=params , 
                                        data=all_sim[[i]]$data_list ,  
                                        inits=inits , 
@@ -772,20 +621,15 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
                                        plots=FALSE,
                                        method = "parallel"))
     
-    mod_mcmc_path <- paste("C:/simulations/dynamic_occupancy/mcmc_matrix/mcmc_matrix_",
-                           i, ".txt", sep = "")
-    write.table(as.matrix(mod_mcmc, chains = TRUE), mod_mcmc_path,
-                row.names = FALSE, sep = "\t")
+    # writing out file stuff
+    basic_name <- base_file_name(all_sim[[i]])
     
-#     # writing out file stuff
-#     basic_name <- base_file_name(all_sim[[i]])
-#     
-#     write_diagnostics(mod_mcmc, iter = i, basic_name = basic_name)
-#     
-#     write_summary(mod_mcmc, iter = i, basic_name = basic_name)
-#     
-#     write_known(one_from_all_sim = all_sim[[i]], iter = i, basic_name = basic_name,
-#                 mod_mcmc = mod_mcmc)
+    write_diagnostics(mod_mcmc, iter = i, basic_name = basic_name)
+    
+    write_summary(mod_mcmc, iter = i, basic_name = basic_name)
+    
+    write_known(one_from_all_sim = all_sim[[i]], iter = i, basic_name = basic_name,
+                mod_mcmc = mod_mcmc)
     
     if(make_comparisons){
       print("Analyzing with comparison_list")
@@ -881,7 +725,6 @@ grab_quant <- function(data = NULL){
 ###----------------------------------------------------------------------------
 
 pull_summary <- function(data){
-  if(class(data) == "mcmc.list") data <- summary(data)
   step_one <- grab_msd(data)
   step_two <- grab_quant(data)
   return(data.frame(step_one, step_two))
