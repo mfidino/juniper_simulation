@@ -16,6 +16,7 @@ library(rjags)
 library(runjags)
 library(mcmcplots)
 
+# load the functions to run everything
 source("simul_prep_functions.R")
 
 
@@ -23,16 +24,11 @@ source("simul_prep_functions.R")
 # simulate the data
 
 
-sim_df <- make_sim_df(nspec = 5, nsite = 118, nyear = 5, nrep = 28,
-                      gam = c(.1, .5, .9), phi = c(.1, .5, .9),
-                      p = c(.1, .5, .9), gam_sd = c(.1, 1, 3),
-                      phi_sd = c(.1, 1, 3), p_sd = c(.1, 1, 3),
-                      add_NA = TRUE, percent_to_NA = 0.2, row_replicate = 1,
-                      cut_off = 20)
 # for our comparison stuff
 sim_df <- make_sim_df(nspec = 3, nsite = 80, nyear = 6, nrep = 28,
-                      gam = .4, phi = .7, p = .1, gam_sd = 1, beta = .7,
-                      beta_sd = 1, inxs = 0, inxs_sd = 2, phi_sd = 1, p_sd = 1, add_NA = FALSE, percent_to_NA = 0.2,
+                      gam = .4, phi = .7, p = .1, gam_sd = 1, beta = .5,
+                      beta_sd = 1, beta2 = .5, beta_sd2 = .5,  inxs = 0, 
+                      inxs_sd = 2, phi_sd = 1, p_sd = 1, add_NA = FALSE, percent_to_NA = 0.2,
                       cut_off = 20,
                       row_replicate = 2)
 
@@ -41,29 +37,27 @@ sim_df <- make_sim_df(nspec = 3, nsite = 80, nyear = 6, nrep = 28,
 # test gens 2 simulations
 
 #Note: takes ~0.5 seconds to run for each row of sim_df
+#Note: known_inxs fills row wise, give number of inxs equal
+#      to size of the entire inxs matrix (we write over the diagonal)
+all_sim <- simulate_from_sim_df(sim_df, test = FALSE,
+                                known_inxs = c(1,1,2,3,0,1,2,3,0))
 
-all_sim <- simulate_from_sim_df(sim_df, test = TRUE)
-
-
+# parameters to follow.
 params <- c("gam",
             "phi",
-            "psi_in",
-            "p_gam",
-            "sigma_gam",
-            "p_phi", 
-            "sigma_phi", 
+            "psi_in", 
             "p_p",
-            "sigma_p",
-            "beta",
-            "mu_gam",
-            "mu_phi",
+            "area_gam",
+            "area_phi",
+            "dist2cent_gam",
+            "dist2cent_phi",
             "p",
-            "sigma_int")
+            "z")
 
 
   
 start_time <- Sys.time()
 batch_analyze(all_sim = list(all_sim[[1]]), params = params, n_chains = 7,adapt_steps = 3000,
-                burn_in = 10000, sample_steps = 90000, thin_steps = 1,
-              make_comparisons = TRUE)
+                burn_in = 20000, sample_steps = 10000, thin_steps = 10,
+              make_comparisons = TRUE, model = "interaction_model.R")
 end_time <- Sys.time()
