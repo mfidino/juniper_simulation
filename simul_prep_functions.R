@@ -485,23 +485,26 @@ make_zinit <- function(y_list = NULL){
 # function to appropriately index the interactions
 # in the bayesian model.
 make_inxs <- function(sim_list = NULL){
-  with(sim_list,{  
-  rows <- rep(c(1:nspec), each = nspec) # for indexing, goes 111222333...
-  cols <- rep(c(1:nspec), nspec) # for indexing goes 123123123...
-  t_mat <- (nspec^2) # size of matrix
-  inm <- matrix(1:t_mat, ncol = nspec) # make the matrix
-  # need to subtract a certain amount depending on # of species
-  minus_inm <- matrix(c(rep(1:(nspec-1), each = (nspec + 1)), 0), ncol = nspec)
-  inm <- inm - minus_inm # do that subtraction
-  diag(inm) <- 1 # cannot have zeros in this, so we set diag to 1
-  inxs <- as.vector(inm) # 
-  # we call on rows_vec, cols_vec, and inxs_vec in the model,
-  # it is input in the data list we throw in jags.
-  return(list(rows_vec = rows,
-              cols_vec = cols,
-              inxs_vec = inxs))
+  with(sim_list,{
+  ns <- nspec
+  col_l <- row_l <- col_u <- row_u <-numeric((ns * ns - ns)/2)
+  for(i in 1:(ns-1)){
+    # algorithm to fill lower columns
+    col_l[min(which(col_l ==0)):(min(which(col_l ==0)) + ns-1-i)] <-  rep(i, ns-i)
+    # algorithm to fill lower rows
+    row_l[min(which(row_l == 0)):(min(which(row_l==0))+ ns-1-i)] <- (i+1):ns
+    # algorithm to fill upper rows
+    row_u[min(which(row_u == 0)):(min(which(row_u==0))+ ns-(ns+1)+i)] <- 1:i
+    # algorithm to fill upper columns
+    col_u[min(which(col_u == 0)):(min(which(col_u==0))+ ns-(ns+1)+i)] <- rep(i + 1, i)
+    
+  }
   
-  })
+  row_vec <- c(row_l, row_u)
+  col_vec <- c(col_l, col_u)
+
+  return(list(rows_vec = row_vec,
+              cols_vec = col_vec))})
   
   
 }
@@ -780,23 +783,55 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
                           n_chains = NULL, adapt_steps = NULL,
                           burn_in = NULL, sample_steps = NULL,
                           thin_steps = NULL, make_comparisons = NULL,
-                          model = NULL){
+                          model = NULL, m_name = NULL){
   
   for(i in 1:length(all_sim)){
     
     print(paste("Analyzing", i, "of", length(all_sim), "simulations", sep = " "))
     if(make_comparisons) print("Analyzing data_list")
    
- # generate initial values
+#  # generate initial values
+#     inits <- function(chain){
+#       gen_list <- function(chain = chain){
+#         list( 
+#           z = all_sim[[i]]$mats$zinit,
+#           gam = rbeta(1, 1, 1),
+#           sigma_gam = runif(1, 0, 5),
+#           p_phi = rbeta(1, 1, 1),
+#           sigma_phi = runif(1, 0, 5),
+#           p_p = rbeta(1, 1, 1),
+#           .RNG.name = switch(chain,
+#                              "1" = "base::Wichmann-Hill",
+#                              "2" = "base::Marsaglia-Multicarry",
+#                              "3" = "base::Super-Duper",
+#                              "4" = "base::Mersenne-Twister",
+#                              "5" = "base::Wichmann-Hill",
+#                              "6" = "base::Marsaglia-Multicarry",
+#                              "7" = "base::Super-Duper",
+#                              "8" = "base::Mersenne-Twister"),
+#           .RNG.seed = sample(1:1e+06, 1)
+#           )
+#       }
+#       return(switch(chain,           
+#         "1" = gen_list(chain),
+#         "2" = gen_list(chain),
+#         "3" = gen_list(chain),
+#         "4" = gen_list(chain),
+#         "5" = gen_list(chain),
+#         "6" = gen_list(chain),
+#         "7" = gen_list(chain),
+#         "8" = gen_list(chain)
+#         )
+#         )
+#     }
     inits <- function(chain){
       gen_list <- function(chain = chain){
         list( 
           z = all_sim[[i]]$mats$zinit,
-          p_gam = rbeta(1, 1, 1),
-          sigma_gam = runif(1, 0, 5),
-          p_phi = rbeta(1, 1, 1),
-          sigma_phi = runif(1, 0, 5),
-          p_p = rbeta(1, 1, 1),
+          gam = runif(3, -3, 3),
+          spe_phi = runif(3, -3, 3),
+          lp = runif(3, -3, 3),
+          tau_int = runif(1, 0.01, 5),
           .RNG.name = switch(chain,
                              "1" = "base::Wichmann-Hill",
                              "2" = "base::Marsaglia-Multicarry",
@@ -807,25 +842,24 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
                              "7" = "base::Super-Duper",
                              "8" = "base::Mersenne-Twister"),
           .RNG.seed = sample(1:1e+06, 1)
-          )
+        )
       }
       return(switch(chain,           
-        "1" = gen_list(chain),
-        "2" = gen_list(chain),
-        "3" = gen_list(chain),
-        "4" = gen_list(chain),
-        "5" = gen_list(chain),
-        "6" = gen_list(chain),
-        "7" = gen_list(chain),
-        "8" = gen_list(chain)
-        )
-        )
+                    "1" = gen_list(chain),
+                    "2" = gen_list(chain),
+                    "3" = gen_list(chain),
+                    "4" = gen_list(chain),
+                    "5" = gen_list(chain),
+                    "6" = gen_list(chain),
+                    "7" = gen_list(chain),
+                    "8" = gen_list(chain)
+      )
+      )
     }
-    
 
     
 # run the jags model.
-    mod_mcmc <- as.mcmc.list(run.jags( model= model , 
+    mod_mcmc2 <- as.mcmc.list(run.jags( model= model , 
                                        monitor=params , 
                                        data=all_sim[[i]]$data_list ,  
                                        inits=inits , 
@@ -839,9 +873,11 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
                                        method = "parallel"))
     
     mod_mcmc_path <- paste("C:/simulations/dynamic_occupancy/mcmc_matrix/mcmc_matrix_",
-                           i, ".txt", sep = "")
+                           m_name,i, ".txt", sep = "")
     write.table(as.matrix(mod_mcmc, chains = TRUE), mod_mcmc_path,
                 row.names = FALSE, sep = "\t")
+saveRDS(all_sim[[i]], paste("C:/simulations/dynamic_occupancy/knowns/all_sim_",
+                                i, ".txt", sep = ""))
 # currently turned this off, we should probably save this stuff though. 
 #     # writing out file stuff
 #     basic_name <- base_file_name(all_sim[[i]])
@@ -857,10 +893,42 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
     # with beta only model.
     if(make_comparisons){
       print("Analyzing with beta_model")
-      mod_mcmc_compare <- as.mcmc.list(run.jags( model="beta_model.txt" , 
+      
+      inits_beta <- function(chain){
+        gen_list <- function(chain = chain){
+          list( 
+            z = all_sim[[i]]$mats$zinit,
+            gam = runif(3, -3, 3),
+            phi = runif(3, -3, 3),
+            lp = runif(3, -3, 3),
+            .RNG.name = switch(chain,
+                               "1" = "base::Wichmann-Hill",
+                               "2" = "base::Marsaglia-Multicarry",
+                               "3" = "base::Super-Duper",
+                               "4" = "base::Mersenne-Twister",
+                               "5" = "base::Wichmann-Hill",
+                               "6" = "base::Marsaglia-Multicarry",
+                               "7" = "base::Super-Duper",
+                               "8" = "base::Mersenne-Twister"),
+            .RNG.seed = sample(1:1e+06, 1)
+          )
+        }
+        return(switch(chain,           
+                      "1" = gen_list(chain),
+                      "2" = gen_list(chain),
+                      "3" = gen_list(chain),
+                      "4" = gen_list(chain),
+                      "5" = gen_list(chain),
+                      "6" = gen_list(chain),
+                      "7" = gen_list(chain),
+                      "8" = gen_list(chain)
+        )
+        )
+      }
+      mod_mcmc_compare <- as.mcmc.list(run.jags( model="beta_model.R" , 
                                          monitor=params , 
                                          data=all_sim[[i]]$data_list,  
-                                         inits=inits , 
+                                         inits=inits_beta , 
                                          n.chains=n_chains ,
                                          adapt=adapt_steps ,
                                          burnin=burn_in , 
@@ -872,9 +940,10 @@ batch_analyze <- function(all_sim = NULL, params = NULL,
       
       
       mod_mcmc_path <- paste("C:/simulations/dynamic_occupancy/mcmc_matrix/mcmc_beta_matrix_",
-                             i, ".txt", sep = "")
+                             m_name,i, ".txt", sep = "")
       write.table(as.matrix(mod_mcmc_compare, chains = TRUE), mod_mcmc_path,
                   row.names = FALSE, sep = "\t")
+
 #       compare_i <- 2
 #       write_diagnostics(mod_mcmc_compare, iter = compare_i, basic_name = basic_name)
 #       
